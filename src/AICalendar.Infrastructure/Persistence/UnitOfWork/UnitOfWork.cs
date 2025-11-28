@@ -1,13 +1,13 @@
-using AICalendar.Application.Common.Interfaces;
 using AICalendar.Domain.Interfaces;
+using AICalendar.Infrastructure.Data;
 
 namespace AICalendar.Infrastructure.Persistence.UnitOfWork;
 
 public class UnitOfWork : IUnitOfWork
 {
-    private readonly IApplicationDbContext _context;
+    private readonly ApplicationDbContext _context;
 
-    public UnitOfWork(IApplicationDbContext context)
+    public UnitOfWork(ApplicationDbContext context)
     {
         _context = context;
     }

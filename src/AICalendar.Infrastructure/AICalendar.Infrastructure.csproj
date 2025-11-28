@@ -21,7 +21,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\AICalendar.Domain\AICalendar.Domain.csproj" />
-    <ProjectReference Include="..\AICalendar.Application\AICalendar.Application.csproj" />
   </ItemGroup>
 
 </Project>

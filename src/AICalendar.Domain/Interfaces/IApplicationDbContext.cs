@@ -1,7 +1,7 @@
 using AICalendar.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
-namespace AICalendar.Application.Common.Interfaces;
+namespace AICalendar.Domain.Interfaces;
 
 public interface IApplicationDbContext
 {

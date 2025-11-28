@@ -1,11 +1,12 @@
 using AICalendar.Domain.Entities;
+using AICalendar.Domain.Interfaces;
 using AICalendar.Infrastructure.Data.SeedData;
 using AICalendar.Infrastructure.Persistence.Configurations;
 using Microsoft.EntityFrameworkCore;
 
 namespace AICalendar.Infrastructure.Data;
 
-public class ApplicationDbContext : DbContext
+public class ApplicationDbContext : DbContext, IApplicationDbContext
 {
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
         : base(options)

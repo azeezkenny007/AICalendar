@@ -1,6 +1,9 @@
+using AICalendar.API.Middleware;
+using AICalendar.APP.Common.Behaviours;
 using AICalendar.CORE.Interfaces;
 using AICalendar.DAL.Data;
 using AICalendar.DAL.Repositories;
+using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -9,6 +12,20 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+// Register MediatR
+builder.Services.AddMediatR(cfg =>
+{
+    cfg.RegisterServicesFromAssembly(typeof(Program).Assembly); // API layer
+    cfg.RegisterServicesFromAssembly(typeof(AICalendar.APP.Class1).Assembly); // APP layer
+
+    // Register pipeline behaviors
+    cfg.AddOpenBehavior(typeof(LoggingBehavior<,>));
+    cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
+});
+
+// Register FluentValidation validators
+builder.Services.AddValidatorsFromAssembly(typeof(AICalendar.APP.Class1).Assembly);
 
 // Configure DbContext
 builder.Services.AddDbContext<AICalendarDbContext>(options =>
@@ -24,15 +41,17 @@ builder.Services.AddScoped<ITransactionRepository, TransactionRepository>();
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
+app.UseMiddleware<GlobalExceptionHandlerMiddleware>();
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
-app.MapControllers();
-
 app.UseHttpsRedirection();
+
+app.MapControllers();
 
 var summaries = new[]
 {

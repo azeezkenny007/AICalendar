@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\AICalendar.Domain\AICalendar.Domain.csproj" />
+    <ProjectReference Include="..\AICalendar.Application\AICalendar.Application.csproj" />
+  </ItemGroup>
+</Project>

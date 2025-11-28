@@ -411,3 +411,6 @@ FodyWeavers.xsd
 # appsettings with secrets (keep appsettings.json template)
 appsettings.Development.json
 appsettings.Production.json
+
+# Entity Framework Migrations
+**/Migrations/

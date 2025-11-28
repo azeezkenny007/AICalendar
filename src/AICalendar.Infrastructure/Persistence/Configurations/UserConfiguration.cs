@@ -17,6 +17,14 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
                 value => UserId.Create(value))
             .IsRequired();
 
+        builder.Property(u => u.FirstName)
+            .IsRequired()
+            .HasMaxLength(100);
+
+        builder.Property(u => u.LastName)
+            .IsRequired()
+            .HasMaxLength(100);
+
         builder.Property(u => u.Username)
             .IsRequired()
             .HasMaxLength(100);
@@ -29,6 +37,8 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
             .IsRequired();
 
         builder.Property(u => u.UpdatedAt);
+
+        builder.Ignore(u => u.FullName);
 
         builder.HasIndex(u => u.Username)
             .IsUnique();

@@ -292,4 +292,3 @@ public static class UserTransactionSeedData
     private static string GetRandomCharity() => new[] { "Charity Organization", "Community Development", "Religious Institution" }[new Random(Guid.NewGuid().GetHashCode()).Next(3)];
     private static string GetRandomOccasion() => new[] { "Birthday", "Wedding", "Anniversary", "Graduation" }[new Random(Guid.NewGuid().GetHashCode()).Next(4)];
 }
-}

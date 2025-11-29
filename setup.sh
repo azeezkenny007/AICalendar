@@ -30,18 +30,27 @@ if [ ! -f .env ]; then
     cp .env.example .env
 
     # Generate random password for SQL Server
-    RANDOM_PASSWORD="Strong@$(openssl rand -base64 12 | tr -d '/+=' | head -c 12)1"
+    MSSQL_PASSWORD="Strong@$(openssl rand -base64 12 | tr -d '/+=' | head -c 12)1"
 
-    # Update .env with generated password
+    # Generate random password for Redis
+    REDIS_PASSWORD="Redis@$(openssl rand -base64 16 | tr -d '/+=' | head -c 16)2"
+
+    # Update .env with generated passwords
     if [[ "$OSTYPE" == "darwin"* ]]; then
         # macOS
-        sed -i '' "s/YourStrong@Passw0rd/$RANDOM_PASSWORD/g" .env
+        sed -i '' "s/YourStrong@Passw0rd/$MSSQL_PASSWORD/g" .env
+        sed -i '' "s/YourRedis@Passw0rd/$REDIS_PASSWORD/g" .env
     else
-        # Linux
-        sed -i "s/YourStrong@Passw0rd/$RANDOM_PASSWORD/g" .env
+        # Linux/WSL
+        sed -i "s/YourStrong@Passw0rd/$MSSQL_PASSWORD/g" .env
+        sed -i "s/YourRedis@Passw0rd/$REDIS_PASSWORD/g" .env
     fi
 
-    echo "✅ Created .env file with generated password"
+    echo "✅ Created .env file with generated passwords"
+    echo "   📊 SQL Server password: $MSSQL_PASSWORD"
+    echo "   🔐 Redis password: $REDIS_PASSWORD"
+    echo ""
+    echo "   💡 Passwords are saved in .env file (gitignored)"
     echo ""
 else
     echo "✅ .env file already exists"

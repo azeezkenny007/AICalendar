@@ -2,10 +2,10 @@ using AICalendar.Application.Common.Behaviors;
 using AICalendar.Domain.Interfaces;
 using AICalendar.Infrastructure.Data;
 using AICalendar.Infrastructure.Persistence.UnitOfWork;
+using AICalendar.Infrastructure.ExternalServices.Cache;
 using AICalendar.API.Filters;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
-using StackExchange.Redis;
 using Hangfire;
 using Hangfire.Dashboard;
 using Hangfire.SqlServer;
@@ -76,50 +76,15 @@ builder.Services.AddHangfire(configuration => configuration
 // Add Hangfire server
 builder.Services.AddHangfireServer(options =>
 {
-    options.WorkerCount = Environment.ProcessorCount * 5;
+    var hangfireSettings = builder.Configuration.GetSection("Hangfire");
+    options.WorkerCount = hangfireSettings.GetValue<int>("WorkerCount", Environment.ProcessorCount * 5);
     options.ServerTimeout = TimeSpan.FromMinutes(4);
     options.SchedulePollingInterval = TimeSpan.FromSeconds(15);
 });
 
-// Register Redis (optional - only if connection string is provided)
-// Use lazy initialization to allow app to start even if Redis is temporarily unavailable
-var redisConnectionString = builder.Configuration.GetConnectionString("RedisConnection");
-if (!string.IsNullOrEmpty(redisConnectionString))
-{
-    builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
-    {
-        var logger = sp.GetRequiredService<ILogger<Program>>();
-        try
-        {
-            var configurationOptions = ConfigurationOptions.Parse(redisConnectionString);
-            configurationOptions.AbortOnConnectFail = false;
-            configurationOptions.ConnectRetry = 3;
-            configurationOptions.ConnectTimeout = 5000;
-            configurationOptions.ReconnectRetryPolicy = new ExponentialRetry(1000, 10000);
+// Register Cache Services (Redis or Null based on configuration)
+builder.Services.AddCacheServices(builder.Configuration);
 
-            var connection = ConnectionMultiplexer.Connect(configurationOptions);
-
-            connection.ConnectionFailed += (sender, e) =>
-            {
-                logger.LogWarning("Redis connection failed: {Exception}", e.Exception?.Message);
-            };
-            connection.ConnectionRestored += (sender, e) =>
-            {
-                logger.LogInformation("Redis connection restored");
-            };
-
-            logger.LogInformation("Redis connection initialized successfully");
-            return connection;
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to initialize Redis connection. The app will start but Redis features will be unavailable. Error: {Error}", ex.Message);
-            // Note: If connection fails, the service won't be registered
-            // HealthController handles null Redis gracefully via optional parameter
-            throw;
-        }
-    });
-}
 
 var app = builder.Build();
 

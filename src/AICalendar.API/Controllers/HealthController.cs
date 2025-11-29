@@ -18,16 +18,19 @@ public class HealthController : ControllerBase
     private readonly IConnectionMultiplexer? _redis;
     private readonly ApplicationDbContext _dbContext;
     private readonly IServiceProvider _serviceProvider;
+    private readonly AICalendar.Application.Common.Interfaces.ICacheService _cacheService;
 
     public HealthController(
         ILogger<HealthController> logger,
         ApplicationDbContext dbContext,
         IServiceProvider serviceProvider,
+        AICalendar.Application.Common.Interfaces.ICacheService cacheService,
         IConnectionMultiplexer? redis = null)
     {
         _logger = logger;
         _dbContext = dbContext;
         _serviceProvider = serviceProvider;
+        _cacheService = cacheService;
         _redis = redis;
     }
 
@@ -78,6 +81,37 @@ public class HealthController : ControllerBase
         return allHealthy
             ? Ok(health)
             : StatusCode(503, health);
+    }
+
+    /// <summary>
+    /// Test the cache service specifically
+    /// </summary>
+    [HttpGet("cache-test")]
+    public async Task<IActionResult> TestCache()
+    {
+        var key = $"health_check_{Guid.NewGuid()}";
+        var expectedValue = "cache_working";
+
+        // Test Set
+        await _cacheService.SetAsync(key, expectedValue, TimeSpan.FromMinutes(1));
+
+        // Test Get
+        var value = await _cacheService.GetAsync<string>(key);
+
+        // Test GetOrSet
+        var getOrSetKey = $"health_check_getorset_{Guid.NewGuid()}";
+        var getOrSetValue = await _cacheService.GetOrSetAsync(
+            getOrSetKey,
+            () => Task.FromResult("generated_value"),
+            TimeSpan.FromMinutes(1));
+
+        return Ok(new
+        {
+            status = value == expectedValue ? "success" : "failed",
+            directGet = value,
+            getOrSet = getOrSetValue,
+            timestamp = DateTime.UtcNow
+        });
     }
 
     private async Task<string> CheckDatabase()

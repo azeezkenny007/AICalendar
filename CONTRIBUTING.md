@@ -1,6 +1,6 @@
 # Contributing to AICalendar
 
-Welcome! Thanks for contributing to AICalendar. To keep our codebase stable, we've adopted a **branch protection workflow**: All changes must go through pull requests (PRs) to the `main` branch. Direct pushes to `main` are blocked to prevent accidental breaks.
+Welcome! Thanks for contributing to AICalendar. To keep our codebase stable, we've adopted a **branch protection workflow**: All changes must go through pull requests (PRs) to the `dev` branch. Direct pushes to `dev` are blocked to prevent accidental breaks.
 
 ## Quick Start for Contributors
 
@@ -22,18 +22,18 @@ git remote add upstream https://github.com/azeezkenny007/AICalendar.git
 git fetch upstream
 ```
 
-### 3. Always Work from the `main` Branch
+### 3. Always Work from the `dev` Branch
 
-Sync your local `main` with the latest:
+Sync your local `dev` with the latest:
 
 ```bash
-git checkout main
-git pull origin main  # Or 'git pull upstream main' if using upstream
+git checkout dev
+git pull origin dev  # Or 'git pull upstream dev' if using upstream
 ```
 
 ### 4. Create a Feature Branch
 
-For every new task/bug/fix, create a branch from `main`. Use descriptive names (e.g., `feature/user-login` or `fix/bug-123`).
+For every new task/bug/fix, create a branch from `dev`. Use descriptive names (e.g., `feature/user-login` or `fix/bug-123`).
 
 ```bash
 git checkout -b feature/your-branch-name
@@ -58,18 +58,18 @@ git push origin feature/your-branch-name
 
 1. Go to the repo on [GitHub.com](https://github.com/azeezkenny007/AICalendar).
 2. You'll see a prompt like "Compare & pull request"—click it.
-3. **Base branch**: Select `main`.
+3. **Base branch**: Select `dev`.
 4. Add a title (e.g., "Add user login feature") and description (what/why/how).
 5. Click **Create pull request**.
 
 ### 8. Review & Merge
 
 - The maintainer will review your PR. Address feedback in comments or new commits.
-- Once approved (and checks pass, if any), it merges to `main`.
+- Once approved (and checks pass, if any), it merges to `dev`.
 - After merge: Delete your branch on GitHub, then clean up locally:
   ```bash
-  git checkout main
-  git pull origin main
+  git checkout dev
+  git pull origin dev
   git branch -d feature/your-branch-name  # Local delete
   ```
 
@@ -127,8 +127,8 @@ This project follows **Clean Architecture** principles:
 
 ## Common Errors & Fixes
 
-- **"Push rejected" to `main`?** That's expected—use PRs instead!
-- **Conflicts?** Pull latest `main`, merge it into your branch (`git merge main`), resolve, then push.
+- **"Push rejected" to `dev`?** That's expected—use PRs instead!
+- **Conflicts?** Pull latest `dev`, merge it into your branch (`git merge dev`), resolve, then push.
 - **No Write Access?** Fork the repo, work there, and PR from your fork.
 - **Build Errors?** Make sure you have .NET 8.0 SDK installed and all dependencies restored.
 

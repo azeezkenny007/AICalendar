@@ -1,4 +1,6 @@
 using Microsoft.Extensions.Logging;
+using Hangfire;
+using System.ComponentModel;
 
 namespace AICalendar.Application.BackgroundJobs;
 
@@ -18,6 +20,9 @@ public class CleanupExpiredPredictionsJob
     /// <summary>
     /// Executes the cleanup of expired predictions
     /// </summary>
+    [DisplayName("Cleanup Expired Predictions")]
+    [AutomaticRetry(Attempts = 3)]
+    [DisableConcurrentExecution(timeoutInSeconds: 60 * 60)] // 1 hour timeout
     public async Task ExecuteAsync(CancellationToken cancellationToken = default)
     {
         try

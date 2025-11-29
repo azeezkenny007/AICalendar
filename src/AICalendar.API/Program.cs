@@ -3,6 +3,7 @@ using AICalendar.Domain.Interfaces;
 using AICalendar.Infrastructure.Data;
 using AICalendar.Infrastructure.Persistence.UnitOfWork;
 using AICalendar.Infrastructure.ExternalServices.Cache;
+using AICalendar.API.Extensions;
 using AICalendar.API.Filters;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
@@ -59,28 +60,7 @@ builder.Services.AddValidatorsFromAssembly(typeof(AICalendar.Application.Assembl
 builder.Services.AddScoped<AICalendar.Application.BackgroundJobs.CleanupExpiredPredictionsJob>();
 
 // Configure Hangfire for background job processing
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-builder.Services.AddHangfire(configuration => configuration
-    .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
-    .UseSimpleAssemblyNameTypeSerializer()
-    .UseRecommendedSerializerSettings()
-    .UseSqlServerStorage(connectionString, new SqlServerStorageOptions
-    {
-        CommandBatchMaxTimeout = TimeSpan.FromMinutes(5),
-        SlidingInvisibilityTimeout = TimeSpan.FromMinutes(5),
-        QueuePollInterval = TimeSpan.Zero,
-        UseRecommendedIsolationLevel = true,
-        DisableGlobalLocks = true
-    }));
-
-// Add Hangfire server
-builder.Services.AddHangfireServer(options =>
-{
-    var hangfireSettings = builder.Configuration.GetSection("Hangfire");
-    options.WorkerCount = hangfireSettings.GetValue<int>("WorkerCount", Environment.ProcessorCount * 5);
-    options.ServerTimeout = TimeSpan.FromMinutes(4);
-    options.SchedulePollingInterval = TimeSpan.FromSeconds(15);
-});
+builder.Services.AddHangfireServices(builder.Configuration);
 
 // Register Cache Services (Redis or Null based on configuration)
 builder.Services.AddCacheServices(builder.Configuration);
@@ -104,33 +84,14 @@ if (app.Environment.IsDevelopment())
     });
 }
 
-// Automatic Migration
-using (var scope = app.Services.CreateScope())
-{
-    var services = scope.ServiceProvider;
-    try
-    {
-        var context = services.GetRequiredService<ApplicationDbContext>();
-        // This applies any pending migrations to the database.
-        // If the database doesn't exist, it creates it.
-        if (context.Database.GetPendingMigrations().Any())
-        {
-            context.Database.Migrate();
-        }
-    }
-    catch (Exception ex)
-    {
-        var logger = services.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "An error occurred while migrating the database.");
-    }
-}
 
 // Initialize Hangfire recurring jobs
 using (var scope = app.Services.CreateScope())
 {
     try
     {
-        AICalendar.Infrastructure.BackgroundJobs.HangfireConfiguration.ConfigureRecurringJobs();
+        var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
+        AICalendar.Infrastructure.BackgroundJobs.HangfireConfiguration.ConfigureRecurringJobs(configuration);
         var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
         logger.LogInformation("Hangfire recurring jobs configured successfully");
     }
@@ -151,21 +112,7 @@ if (!app.Environment.IsDevelopment())
 app.UseAuthorization();
 
 // Configure Hangfire Dashboard
-// In Development: Open access
-// In Production: Protected by HangfireAuthorizationFilter (requires authentication)
-app.UseHangfireDashboard("/hangfire", new DashboardOptions
-{
-    Authorization = new[] { new HangfireAuthorizationFilter() },
-    DashboardTitle = "AICalendar Background Jobs",
-    StatsPollingInterval = 2000,
-    // Production security settings
-    IsReadOnlyFunc = (DashboardContext context) =>
-    {
-        // Make dashboard read-only in production (optional)
-        var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
-        return environment == "Production";
-    }
-});
+app.UseHangfireDashboardWithAuth();
 
 app.MapControllers();
 

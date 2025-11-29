@@ -2,6 +2,8 @@ using Hangfire;
 using System.Threading;
 using AICalendar.Application.BackgroundJobs;
 
+using Microsoft.Extensions.Configuration;
+
 namespace AICalendar.Infrastructure.BackgroundJobs;
 
 /// <summary>
@@ -14,13 +16,16 @@ public static class HangfireConfiguration
     /// Configures and schedules all recurring Hangfire jobs
     /// Call this method during application startup
     /// </summary>
-    public static void ConfigureRecurringJobs()
+    public static void ConfigureRecurringJobs(IConfiguration configuration)
     {
-        // Schedule cleanup of expired predictions - runs daily at 2 AM UTC
+        // Get cron expression from configuration or default to daily at 2 AM UTC
+        var cleanupCron = configuration["BackgroundJobs:CleanupExpiredPredictions:CronExpression"] ?? Cron.Daily(2);
+
+        // Schedule cleanup of expired predictions
         RecurringJob.AddOrUpdate<CleanupExpiredPredictionsJob>(
             "cleanup-expired-predictions",
             job => job.ExecuteAsync(CancellationToken.None),
-            Cron.Daily(2), // Daily at 2:00 AM UTC
+            cleanupCron,
             new RecurringJobOptions
             {
                 TimeZone = TimeZoneInfo.Utc

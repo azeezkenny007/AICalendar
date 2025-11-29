@@ -49,8 +49,8 @@ docker compose ps
 
 All services should show as "healthy". Access your application:
 
-- **API**: http://localhost:8080
-- **Health Check**: http://localhost:8080/health
+- **Health Check for api**: http://localhost:8080/health
+- **Health Check for all services**: http://localhost:8080/health/detailed
 - **Swagger Documentation**: http://localhost:8080/swagger
 - **Hangfire Dashboard**: http://localhost:8080/hangfire
 

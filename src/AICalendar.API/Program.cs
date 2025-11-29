@@ -7,9 +7,7 @@ using AICalendar.API.Extensions;
 using AICalendar.API.Filters;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
-using Hangfire;
-using Hangfire.Dashboard;
-using Hangfire.SqlServer;
+using AICalendar.Application.BackgroundJobs;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -57,7 +55,7 @@ builder.Services.AddMediatR(cfg =>
 builder.Services.AddValidatorsFromAssembly(typeof(AICalendar.Application.AssemblyReference).Assembly);
 
 // Register background jobs for Hangfire
-builder.Services.AddScoped<AICalendar.Application.BackgroundJobs.CleanupExpiredPredictionsJob>();
+builder.Services.AddScoped<CleanupExpiredPredictionsJob>();
 
 // Configure Hangfire for background job processing
 builder.Services.AddHangfireServices(builder.Configuration);

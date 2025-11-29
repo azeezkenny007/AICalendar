@@ -42,8 +42,8 @@ services:
       - DOTNET_USE_POLLING_FILE_WATCHER=true
       - DOTNET_WATCH_SUPPRESS_LAUNCH_BROWSER=true
     volumes:
-      # Source code mount (read-only for safety)
-      - ./src:/src/src:ro
+      # Source code mount (read-write to allow migrations)
+      - ./src:/src/src
       # Allow write to bin/obj for builds
       - api-bin:/src/src/AICalendar.API/bin
       - api-obj:/src/src/AICalendar.API/obj

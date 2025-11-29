@@ -39,7 +39,8 @@ public static class HangfireServiceExtensions
                 QueuePollInterval = TimeSpan.Zero,
                 UseRecommendedIsolationLevel = true,
                 DisableGlobalLocks = true,
-                PrepareSchemaIfNecessary = true
+                PrepareSchemaIfNecessary = true,
+                SchemaName = "HangFire"
             })
             .UseFilter(new AutomaticRetryAttribute { Attempts = hangfireSettings.RetryAttempts })
             .UseFilter(provider.GetRequiredService<LogJobFilter>())); // Resolve from DI

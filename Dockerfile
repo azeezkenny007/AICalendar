@@ -33,6 +33,11 @@ COPY ["src/AICalendar.Infrastructure/AICalendar.Infrastructure.csproj", "src/AIC
 # Restore dependencies
 RUN dotnet restore "src/AICalendar.API/AICalendar.API.csproj"
 
+# Install EF Core tools for migrations (development only)
+RUN dotnet tool install --global dotnet-ef --version 8.0.0
+ENV PATH="${PATH}:/root/.dotnet/tools"
+
+
 # Copy all source code
 COPY . .
 

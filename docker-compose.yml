@@ -1,0 +1,152 @@
+# docker-compose.yml - Professional Cross-Platform Setup
+# Works on: Windows, Mac, Linux
+# Run with: docker compose up
+
+services:
+  # ============================================================================
+  # API Service (Your .NET 8 Application)
+  # ============================================================================
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: build
+      args:
+        BUILD_CONFIGURATION: Debug
+    container_name: aicalendar-api
+    command: >
+      sh -c " dotnet watch run --project /src/src/AICalendar.API/AICalendar.API.csproj --urls http://0.0.0.0:8080 --non-interactive --no-hot-reload "
+    ports:
+      - "8080:8080" # API endpoints
+      - "8081:8081" # HTTPS (if configured)
+    environment:
+      # ASP.NET Core
+      - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development}
+      - ASPNETCORE_URLS=http://+:8080
+
+      # Database Connection (SQL Server)
+      - ConnectionStrings__DefaultConnection=Server=db;Database=AICalendarDb;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;
+
+      # Redis Connection
+      - ConnectionStrings__RedisConnection=redis:6379,password=${REDIS_PASSWORD:-devpassword},abortConnect=false
+
+      # Logging (Reduce verbosity)
+      - Logging__LogLevel__Default=Information
+      - Logging__LogLevel__Microsoft=Warning
+      - Logging__LogLevel__Microsoft.EntityFrameworkCore=Warning
+      - Logging__LogLevel__Microsoft.AspNetCore=Warning
+      - Logging__LogLevel__Microsoft.Hosting.Lifetime=Information
+      - Logging__Console__FormatterName=Simple
+
+      # Dotnet watch options
+      - DOTNET_USE_POLLING_FILE_WATCHER=true
+      - DOTNET_WATCH_SUPPRESS_LAUNCH_BROWSER=true
+    volumes:
+      # Source code mount (read-write to allow migrations)
+      - ./src:/src/src
+      # Allow write to bin/obj for builds
+      - api-bin:/src/src/AICalendar.API/bin
+      - api-obj:/src/src/AICalendar.API/obj
+      - application-bin:/src/src/AICalendar.Application/bin
+      - application-obj:/src/src/AICalendar.Application/obj
+      - domain-bin:/src/src/AICalendar.Domain/bin
+      - domain-obj:/src/src/AICalendar.Domain/obj
+      - infrastructure-bin:/src/src/AICalendar.Infrastructure/bin
+      - infrastructure-obj:/src/src/AICalendar.Infrastructure/obj
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    networks:
+      - aicalendar-network
+
+  # ============================================================================
+  # SQL Server Database
+  # ============================================================================
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: aicalendar-db
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=${MSSQL_SA_PASSWORD}
+      - MSSQL_PID=Developer
+    ports:
+      - "1433:1433"
+    volumes:
+      - mssql_data:/var/opt/mssql
+    healthcheck:
+      test: [ "CMD-SHELL", "bash -c '</dev/tcp/localhost/1433' || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - aicalendar-network
+
+  # ============================================================================
+  # Redis Cache (For prediction caching)
+  # ============================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: aicalendar-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-devpassword}
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: [ "CMD", "redis-cli", "--raw", "incr", "ping" ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - aicalendar-network
+
+# ============================================================================
+# Volumes (Persistent Data + Build Artifacts)
+# ============================================================================
+volumes:
+  # Database data
+  mssql_data:
+    name: aicalendar_mssql_data
+
+  # Redis data
+  redis_data:
+    name: aicalendar_redis_data
+
+  # Build artifacts (prevents conflicts on Windows)
+  api-bin:
+    name: aicalendar_api_bin
+  api-obj:
+    name: aicalendar_api_obj
+  application-bin:
+    name: aicalendar_application_bin
+  application-obj:
+    name: aicalendar_application_obj
+  domain-bin:
+    name: aicalendar_domain_bin
+  domain-obj:
+    name: aicalendar_domain_obj
+  infrastructure-bin:
+    name: aicalendar_infrastructure_bin
+  infrastructure-obj:
+    name: aicalendar_infrastructure_obj
+
+# ============================================================================
+# Networks
+# ============================================================================
+networks:
+  aicalendar-network:
+    name: aicalendar_network
+    driver: bridge

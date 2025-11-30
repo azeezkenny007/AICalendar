@@ -1,6 +1,8 @@
+using AICalendar.API.Middleware;
 using AICalendar.Application.Common.Behaviors;
 using AICalendar.Domain.Interfaces;
 using AICalendar.Infrastructure.Data;
+using AICalendar.Infrastructure.Persistence.Repositories;
 using AICalendar.Infrastructure.Persistence.UnitOfWork;
 using AICalendar.Infrastructure.ExternalServices.Cache;
 using AICalendar.API.Extensions;
@@ -14,6 +16,17 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
+});
+
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
@@ -26,7 +39,6 @@ builder.Services.AddSwaggerGen(c =>
             Name = "AICalendar Team"
         }
     });
-
     // Include XML comments if available
     var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
@@ -40,8 +52,14 @@ builder.Services.AddSwaggerGen(c =>
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+// Register Repositories
+builder.Services.AddScoped<ITransactionRepository, TransactionRepository>();
+
 // Register UnitOfWork
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+// Register AutoMapper
+builder.Services.AddAutoMapper(typeof(AICalendar.Application.AssemblyReference).Assembly);
 
 // Register MediatR
 builder.Services.AddMediatR(cfg =>
@@ -67,6 +85,10 @@ builder.Services.AddCacheServices(builder.Configuration);
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
+
+// Add global exception handling middleware (must be first in pipeline)
+app.UseMiddleware<ExceptionHandlingMiddleware>();
+
 // Swagger should be available in Development
 if (app.Environment.IsDevelopment())
 {
@@ -80,6 +102,11 @@ if (app.Environment.IsDevelopment())
         c.EnableFilter();
         c.EnableValidator();
     });
+}
+else
+{
+    // In production, don't use DeveloperExceptionPage
+    app.UseHsts();
 }
 
 
@@ -106,6 +133,9 @@ if (!app.Environment.IsDevelopment())
 {
     app.UseHttpsRedirection();
 }
+
+// Enable CORS
+app.UseCors("AllowAll");
 
 app.UseAuthorization();
 

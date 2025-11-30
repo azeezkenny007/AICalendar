@@ -12,6 +12,8 @@ public class Transaction : Entity<TransactionId>
     public TransactionType Type { get; private set; }
     public DateTime TransactionDate { get; private set; }
     public DateTime CreatedAt { get; private set; }
+    public bool IsKept { get; private set; } = false;
+    public bool IsDiscarded { get; private set; } = false;
 
     // EF Core needs a parameterless constructor
     private Transaction()
@@ -57,5 +59,17 @@ public class Transaction : Entity<TransactionId>
     public void UpdateType(TransactionType type)
     {
         Type = type;
+    }
+
+    public void MarkAsKept()
+    {
+        IsKept = true;
+        IsDiscarded = false;
+    }
+
+    public void MarkAsDiscarded()
+    {
+        IsDiscarded = true;
+        IsKept = false;
     }
 }

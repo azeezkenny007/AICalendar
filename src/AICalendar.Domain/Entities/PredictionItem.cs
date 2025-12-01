@@ -15,6 +15,10 @@ public class PredictionItem : Entity<PredictionItemId>
     public PatternType Pattern { get; private set; }
     public bool? IsAccepted { get; private set; } // null = Pending, true = Accepted, false = Rejected
 
+    public bool IsEdited { get; private set; }
+    public decimal? OriginalAmount { get; private set; }
+    public DateTime? OriginalDueDate { get; private set; }
+
     private PredictionItem(
         PredictionItemId id,
         Guid transactionId,
@@ -48,6 +52,27 @@ public class PredictionItem : Entity<PredictionItemId>
         PatternType pattern)
     {
         return new PredictionItem(PredictionItemId.Create(), transactionId, merchant, amount, dueDate, explanation, confidence, pattern);
+    }
+
+    public Result Edit(string merchant, decimal amount, DateTime dueDate)
+    {
+        if (IsAccepted.HasValue)
+        {
+            return Result.Failure("Cannot edit an item that has already been accepted or rejected.");
+        }
+
+        if (!IsEdited)
+        {
+            OriginalAmount = Amount;
+            OriginalDueDate = DueDate;
+            IsEdited = true;
+        }
+
+        Merchant = merchant;
+        Amount = amount;
+        DueDate = dueDate;
+
+        return Result.Success();
     }
 
     public void Accept()

@@ -89,7 +89,16 @@ public class OutboxProcessorJob
                         message.Id
                     );
 
-                    await _publisher.Publish(domainEvent);
+                    // Wrap domain event in DomainEventNotification<> so it can be handled by MediatR
+                    var notificationType = typeof(AICalendar.Application.Common.Notifications.DomainEventNotification<>).MakeGenericType(eventType);
+                    var notification = Activator.CreateInstance(notificationType, domainEvent);
+
+                    if (notification == null)
+                    {
+                         throw new InvalidOperationException($"Failed to create notification wrapper for event type {eventType.Name}");
+                    }
+
+                    await _publisher.Publish(notification);
 
                     // 4. Mark as processed
                     message.ProcessedOnUtc = DateTime.UtcNow;

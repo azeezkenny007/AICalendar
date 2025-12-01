@@ -1,6 +1,7 @@
 using AICalendar.Domain.Common;
 using AICalendar.Domain.Entities;
 using AICalendar.Domain.Enums;
+using AICalendar.Domain.Events;
 using AICalendar.Domain.ValueObjects;
 
 namespace AICalendar.Domain.Aggregates.PredictionAggregate;
@@ -63,7 +64,13 @@ public class Prediction : AggregateRoot<PredictionId>
         Status = PredictionStatus.Generated;
         UpdatedAt = DateTime.UtcNow;
 
-        // AddDomainEvent(new PredictionGeneratedEvent(this));
+        AddDomainEvent(new PredictionGeneratedEvent(
+            PredictionId,
+            UserId,
+            Cycle,
+            _items.Count,
+            DateTime.UtcNow
+        ));
 
         return Result.Success();
     }
@@ -85,7 +92,18 @@ public class Prediction : AggregateRoot<PredictionId>
         Status = PredictionStatus.Reviewing;
         UpdatedAt = DateTime.UtcNow;
 
-        // AddDomainEvent(new PredictionAcceptedEvent(PredictionId, itemId));
+        AddDomainEvent(new PredictionAcceptedEvent(
+            PredictionId,
+            itemId,
+            UserId,
+            item.Merchant,
+            item.Amount,
+            item.DueDate,
+            item.IsEdited,
+            item.OriginalAmount,
+            item.OriginalDueDate,
+            DateTime.UtcNow
+        ));
 
         CheckIfCompleted();
 
@@ -109,9 +127,56 @@ public class Prediction : AggregateRoot<PredictionId>
         Status = PredictionStatus.Reviewing;
         UpdatedAt = DateTime.UtcNow;
 
-        // AddDomainEvent(new PredictionRejectedEvent(PredictionId, itemId));
+        AddDomainEvent(new PredictionRejectedEvent(
+            PredictionId,
+            itemId,
+            UserId,
+            item.Merchant,
+            item.Amount,
+            item.DueDate,
+            DateTime.UtcNow
+        ));
 
         CheckIfCompleted();
+
+        return Result.Success();
+    }
+
+    public Result EditItem(PredictionItemId itemId, string merchant, decimal amount, DateTime dueDate)
+    {
+        var item = _items.FirstOrDefault(x => x.Id.Value == itemId.Value);
+        if (item == null)
+        {
+            return Result.Failure("Item not found.");
+        }
+
+        if (Status == PredictionStatus.Expired || Status == PredictionStatus.Failed)
+        {
+            return Result.Failure($"Cannot edit items when status is {Status}");
+        }
+
+        var originalAmount = item.Amount;
+        var originalDueDate = item.DueDate;
+
+        var result = item.Edit(merchant, amount, dueDate);
+        if (!result.IsSuccess)
+        {
+            return result;
+        }
+
+        UpdatedAt = DateTime.UtcNow;
+
+        AddDomainEvent(new PredictionItemEditedEvent(
+            PredictionId,
+            itemId,
+            UserId,
+            merchant,
+            originalAmount,
+            amount,
+            originalDueDate,
+            dueDate,
+            DateTime.UtcNow
+        ));
 
         return Result.Success();
     }

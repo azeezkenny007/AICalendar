@@ -130,7 +130,8 @@ using (var scope = app.Services.CreateScope())
     try
     {
         var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
-        AICalendar.Infrastructure.BackgroundJobs.HangfireConfiguration.ConfigureRecurringJobs(configuration);
+        var recurringJobManager = scope.ServiceProvider.GetRequiredService<Hangfire.IRecurringJobManager>();
+        AICalendar.Infrastructure.BackgroundJobs.HangfireConfiguration.ConfigureRecurringJobs(configuration, recurringJobManager);
         var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
         logger.LogInformation("Hangfire recurring jobs configured successfully");
     }

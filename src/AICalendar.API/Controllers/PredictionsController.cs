@@ -3,7 +3,6 @@ using AICalendar.Application.Calendar.Commands.EditTransaction;
 using AICalendar.Application.Calendar.Commands.KeepPrediction;
 using AICalendar.Application.Calendar.DTOs;
 using AICalendar.Application.Calendar.Queries.GetCalendarPredictions;
-using AICalendar.Application.Calendar.Queries.GetKeptTransactions;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
@@ -12,12 +11,12 @@ namespace AICalendar.API.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Produces("application/json")]
-public class CalendarController : ControllerBase
+public class PredictionsController : ControllerBase
 {
     private readonly IMediator _mediator;
-    private readonly ILogger<CalendarController> _logger;
+    private readonly ILogger<PredictionsController> _logger;
 
-    public CalendarController(IMediator mediator, ILogger<CalendarController> logger)
+    public PredictionsController(IMediator mediator, ILogger<PredictionsController> logger)
     {
         _mediator = mediator;
         _logger = logger;
@@ -118,30 +117,5 @@ public class CalendarController : ControllerBase
         }
 
         return Ok(new { message = "Transaction updated and marked as edited", transactionId });
-    }
-
-    /// <summary>
-    /// Get all kept transactions for a user
-    /// </summary>
-    /// <param name="userId">User ID</param>
-    /// <returns>List of kept transactions</returns>
-    /// <response code="200">Returns the kept transactions</response>
-    /// <response code="404">No transactions found</response>
-    [HttpGet("kept/{userId:guid}")]
-    [ProducesResponseType(typeof(List<TransactionDetailDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetKeptTransactions(Guid userId)
-    {
-        _logger.LogInformation("Getting kept transactions for user {UserId}", userId);
-
-        var query = new GetKeptTransactionsQuery(userId);
-        var result = await _mediator.Send(query);
-
-        if (!result.IsSuccess)
-        {
-            return NotFound(new { message = result.Error });
-        }
-
-        return Ok(result.Value);
     }
 }

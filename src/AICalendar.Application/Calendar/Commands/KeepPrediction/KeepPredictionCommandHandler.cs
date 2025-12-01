@@ -8,10 +8,12 @@ namespace AICalendar.Application.Calendar.Commands.KeepPrediction;
 public class KeepPredictionCommandHandler : IRequestHandler<KeepPredictionCommand, Result<bool>>
 {
     private readonly ITransactionRepository _transactionRepository;
+    private readonly IUnitOfWork _unitOfWork;
 
-    public KeepPredictionCommandHandler(ITransactionRepository transactionRepository)
+    public KeepPredictionCommandHandler(ITransactionRepository transactionRepository,IUnitOfWork unitOfWork)
     {
         _transactionRepository = transactionRepository;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<bool>> Handle(KeepPredictionCommand request, CancellationToken cancellationToken)
@@ -29,6 +31,7 @@ public class KeepPredictionCommandHandler : IRequestHandler<KeepPredictionComman
 
         // Save to database
         await _transactionRepository.UpdateAsync(transaction, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         // Update the in-memory status to "Kept"
         PredictionStatusStore.SetStatus(request.TransactionId, "Kept");

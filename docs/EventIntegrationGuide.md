@@ -1,145 +1,216 @@
-# 📡 Domain Event Integration Guide
+# 📘 Domain Development & Event Integration Guide
 
 **Target Audience:** Calendar Dev, UserFeedback Dev
-**Topic:** Consuming Domain Events via Outbox Pattern
+**Purpose:** Standardize domain modeling and event consumption across the AICalendar project.
 
 ---
 
-## 🚀 Overview
+## 🏗️ Part 1: Domain Modeling Guidelines
 
-We have implemented the **Outbox Pattern** to ensure reliable event delivery. When a domain event occurs (e.g., a prediction is accepted), it is saved to the database and then processed asynchronously by a background job.
+We follow **Domain-Driven Design (DDD)** principles. Your domain logic should be pure, rich, and isolated from infrastructure concerns.
 
-As a developer, you don't need to worry about the outbox mechanism. You simply need to **create an Event Handler** to react to these events.
+### 1. Folder Structure
+Follow this structure for your feature:
 
----
+```
+src/AICalendar.Domain/
+├── Aggregates/
+│   └── CalendarAggregate/
+│       ├── Calendar.cs          (Aggregate Root)
+│       ├── CalendarItem.cs      (Entity)
+│       └── CalendarId.cs        (Value Object)
+├── Events/                      (Domain Events)
+├── ValueObjects/                (Shared Value Objects)
+└── Interfaces/                  (Repository Interfaces)
+```
 
-## 📋 Available Events
-
-These events are defined in `src/AICalendar.Domain/Events/`.
-
-### 1. `PredictionAcceptedEvent`
-Triggered when a user accepts a prediction.
-- **Payload:** `PredictionId`, `ItemId`, `UserId`, `Merchant`, `Amount`, `DueDate`, `WasEdited`, `OriginalAmount`, `OriginalDueDate`
-- **Use Case:** Create Calendar Item, Record Positive Feedback
-
-### 2. `PredictionRejectedEvent`
-Triggered when a user rejects a prediction.
-- **Payload:** `PredictionId`, `ItemId`, `UserId`, `Merchant`, `Amount`, `RejectedAt`
-- **Use Case:** Record Negative Feedback, Update Analytics
-
-### 3. `PredictionItemEditedEvent`
-Triggered when a user edits a prediction before accepting.
-- **Payload:** `PredictionId`, `ItemId`, `UserId`, `OriginalAmount`, `NewAmount`, `OriginalDueDate`, `NewDueDate`
-- **Use Case:** Record Correction Feedback (Crucial for AI training)
-
-### 4. `PredictionGeneratedEvent`
-Triggered when new predictions are generated.
-- **Payload:** `PredictionId`, `UserId`, `Cycle`, `ItemCount`
-- **Use Case:** Send Notification, Analytics
-
----
-
-## 🛠️ How to Create an Event Handler
-
-We use **MediatR** for event handling. However, to keep our Domain layer pure, we wrap domain events in a `DomainEventNotification<T>`.
-
-**Your handler must implement:**
-`INotificationHandler<DomainEventNotification<YourEventType>>`
-
-### 📝 Code Template
-
-Create your handler in `src/AICalendar.Application/Features/[YourFeature]/EventHandlers/`.
+### 2. Value Objects (The Building Blocks)
+- **Rule:** Use Value Objects for all IDs and complex properties.
+- **Why:** Prevents "Primitive Obsession" (e.g., passing `Guid` everywhere).
+- **Base Class:** Inherit from `ValueObject`.
 
 ```csharp
-using AICalendar.Application.Common.Notifications;
-using AICalendar.Domain.Events;
-using MediatR;
-using Microsoft.Extensions.Logging;
-
-namespace AICalendar.Application.Features.Calendar.EventHandlers;
-
-public class PredictionAcceptedEventHandler
-    : INotificationHandler<DomainEventNotification<PredictionAcceptedEvent>>
+public class CalendarId : ValueObject
 {
-    private readonly ICalendarRepository _calendarRepository;
-    private readonly ILogger<PredictionAcceptedEventHandler> _logger;
+    public Guid Value { get; }
 
-    public PredictionAcceptedEventHandler(
-        ICalendarRepository calendarRepository,
-        ILogger<PredictionAcceptedEventHandler> logger)
+    private CalendarId(Guid value)
     {
-        _calendarRepository = calendarRepository;
-        _logger = logger;
+        Value = value;
     }
 
-    public async Task Handle(
-        DomainEventNotification<PredictionAcceptedEvent> notification,
-        CancellationToken cancellationToken)
+    public static CalendarId Create(Guid value)
     {
-        // 1. Unwrap the domain event
-        var domainEvent = notification.DomainEvent;
+        // Validation here
+        return new CalendarId(value);
+    }
 
-        _logger.LogInformation("Handling PredictionAcceptedEvent for Item {ItemId}", domainEvent.ItemId);
+    public static CalendarId CreateUnique() => new(Guid.NewGuid());
 
-        // 2. Implement your business logic
-        // Example: Create a calendar item
-        var calendarItem = CalendarItem.Create(
-            domainEvent.UserId,
-            domainEvent.Merchant,
-            domainEvent.Amount,
-            domainEvent.DueDate
-        );
+    protected override IEnumerable<object> GetEqualityComponents()
+    {
+        yield return Value;
+    }
+}
+```
 
-        await _calendarRepository.AddAsync(calendarItem, cancellationToken);
+### 3. Entities
+- **Rule:** Entities have an identity (`Id`) and a lifecycle.
+- **Base Class:** Inherit from `Entity<TId>`.
 
-        // Note: Changes are saved automatically by UnitOfWork if this runs in a command context,
-        // but since this is a background job, you might need to call SaveChanges explicitly
-        // depending on your repository implementation.
+```csharp
+public class CalendarItem : Entity<CalendarItemId>
+{
+    public string Title { get; private set; }
+    public DateTime StartTime { get; private set; }
+
+    // Private constructor for EF Core
+    private CalendarItem() { }
+
+    // Factory method
+    public static CalendarItem Create(string title, DateTime startTime)
+    {
+        return new CalendarItem(CalendarItemId.CreateUnique(), title, startTime);
+    }
+}
+```
+
+### 4. Aggregate Roots
+- **Rule:** The entry point for consistency. Only Aggregates can be loaded/saved via Repositories.
+- **Base Class:** Inherit from `AggregateRoot<TId>`.
+- **Logic:** Encapsulate all business rules here.
+
+```csharp
+public class Calendar : AggregateRoot<CalendarId>
+{
+    private readonly List<CalendarItem> _items = new();
+    public IReadOnlyCollection<CalendarItem> Items => _items.AsReadOnly();
+
+    public void AddItem(CalendarItem item)
+    {
+        // Enforce invariants
+        if (_items.Any(i => i.StartTime == item.StartTime))
+            throw new DomainException("Conflict detected");
+
+        _items.Add(item);
+
+        // Raise event
+        AddDomainEvent(new CalendarItemAddedEvent(Id, item.Id));
     }
 }
 ```
 
 ---
 
-## 👷 Instructions for **Calendar Dev**
+## 📡 Part 2: Consuming Domain Events (Outbox Pattern)
 
-**Goal:** When a user accepts a prediction, it must become a real item on their calendar.
+We use the **Outbox Pattern** to ensure reliable event delivery. When the `Prediction` module raises an event, you can react to it in your module.
 
-1.  **Subscribe to:** `PredictionAcceptedEvent`
-2.  **Action:**
-    *   Create a new `CalendarItem` entity.
-    *   Map `Merchant`, `Amount`, `DueDate` from the event.
-    *   Link it to the `UserId`.
-    *   Save to `CalendarRepository`.
-3.  **Note:** Ensure you handle duplicates (Idempotency). If the event is processed twice, don't create two calendar items. Use `PredictionItemId` as a reference or idempotency key.
+### Available Events
+| Event | Payload | Use Case |
+|-------|---------|----------|
+| `PredictionAcceptedEvent` | Merchant, Amount, Date | **Calendar:** Create Item<br>**Feedback:** Record Positive |
+| `PredictionRejectedEvent` | Merchant, Reason | **Feedback:** Record Negative |
+| `PredictionItemEditedEvent` | Old/New Values | **Feedback:** Record Correction (Critical for AI) |
+
+### How to Create an Event Handler
+Handlers run in the background (Hangfire). Implement `INotificationHandler<DomainEventNotification<T>>`.
+
+**Example: Creating a Calendar Item from a Prediction**
+
+```csharp
+// src/AICalendar.Application/Features/Calendar/EventHandlers/PredictionAcceptedEventHandler.cs
+
+using AICalendar.Application.Common.Notifications;
+using AICalendar.Domain.Events;
+
+public class PredictionAcceptedEventHandler
+    : INotificationHandler<DomainEventNotification<PredictionAcceptedEvent>>
+{
+    private readonly ICalendarRepository _repository;
+    private readonly ILogger _logger;
+
+    public async Task Handle(
+        DomainEventNotification<PredictionAcceptedEvent> notification,
+        CancellationToken ct)
+    {
+        var evt = notification.DomainEvent;
+        _logger.LogInformation("Processing accepted prediction {Id}", evt.ItemId);
+
+        // 1. Idempotency Check (Prevent duplicates)
+        if (await _repository.ExistsByPredictionIdAsync(evt.ItemId))
+        {
+            _logger.LogWarning("Calendar item already exists for prediction {Id}", evt.ItemId);
+            return;
+        }
+
+        // 2. Create Aggregate
+        var calendarItem = CalendarItem.Create(
+            evt.Merchant,
+            evt.Amount,
+            evt.DueDate
+        );
+
+        // 3. Save
+        await _repository.AddAsync(calendarItem, ct);
+    }
+}
+```
 
 ---
 
-## 👷 Instructions for **UserFeedback Dev**
+## 💾 Part 3: Repositories & Persistence
 
-**Goal:** Collect data to retrain the AI model. We need to know what the AI got right, what it got wrong, and how the user corrected it.
+### 1. Define Interface (Domain Layer)
+Define what you need, not how it's stored.
 
-### Task 1: Handle Acceptance
-1.  **Subscribe to:** `PredictionAcceptedEvent`
-2.  **Action:** Create a `UserFeedback` entry with `Type = Positive`.
-3.  **Data:** Store the `Merchant`, `Amount`, and `ConfidenceScore` (if available via lookup).
+```csharp
+// src/AICalendar.Domain/Interfaces/ICalendarRepository.cs
+public interface ICalendarRepository
+{
+    Task<Calendar?> GetByIdAsync(CalendarId id, CancellationToken ct = default);
+    Task AddAsync(Calendar calendar, CancellationToken ct = default);
+}
+```
 
-### Task 2: Handle Rejection
-1.  **Subscribe to:** `PredictionRejectedEvent`
-2.  **Action:** Create a `UserFeedback` entry with `Type = Negative`.
-3.  **Data:** This tells the AI "This pattern is wrong".
+### 2. Implement (Infrastructure Layer)
+Implement using EF Core.
 
-### Task 3: Handle Edits (High Value)
-1.  **Subscribe to:** `PredictionItemEditedEvent`
-2.  **Action:** Create a `UserFeedback` entry with `Type = Correction`.
-3.  **Data:** Store both `Original` values (what AI guessed) and `New` values (what user wanted).
-4.  **Why:** This is the most valuable data for training. It teaches the AI specifically *how* it was wrong (e.g., "Netflix is $15.99, not $12.99").
+```csharp
+// src/AICalendar.Infrastructure/Persistence/Repositories/CalendarRepository.cs
+public class CalendarRepository : ICalendarRepository
+{
+    private readonly ApplicationDbContext _context;
+
+    public async Task AddAsync(Calendar calendar, CancellationToken ct)
+    {
+        await _context.Calendars.AddAsync(calendar, ct);
+    }
+}
+```
+
+### 3. Register (Program.cs)
+```csharp
+builder.Services.AddScoped<ICalendarRepository, CalendarRepository>();
+```
 
 ---
 
-## ⚠️ Important Notes
+## ✅ Checklist for New Features
 
-1.  **Async & Background:** These handlers run in a background job (Hangfire). They do **not** block the user's HTTP request.
-2.  **Retries:** If your handler throws an exception, Hangfire will retry it automatically. Ensure your logic is **Idempotent** (safe to run multiple times).
-3.  **Logging:** Always log the start and completion of your handler.
-4.  **Dependency Injection:** All your repositories and services are available via constructor injection.
+1.  [ ] **Domain:** Define Aggregate, Entities, and Value Objects.
+2.  [ ] **Domain:** Define Repository Interface.
+3.  [ ] **Infrastructure:** Create EF Core Configuration (`IEntityTypeConfiguration`).
+4.  [ ] **Infrastructure:** Implement Repository.
+5.  [ ] **Application:** Create Command/Query Handlers (MediatR).
+6.  [ ] **Application:** Create Event Handlers (if consuming events).
+7.  [ ] **API:** Create Controller Endpoints.
+
+---
+
+## 💡 Best Practices
+
+-   **Private Setters:** Properties should be `private set` to enforce encapsulation.
+-   **Static Factory Methods:** Use `Create()` instead of public constructors.
+-   **Rich Models:** Put logic in entities, not services.
+-   **Pure Domain:** No external dependencies (MediatR, EF Core) in `AICalendar.Domain`.

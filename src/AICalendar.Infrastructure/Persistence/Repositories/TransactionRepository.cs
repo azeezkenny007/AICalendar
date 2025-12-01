@@ -34,6 +34,5 @@ public class TransactionRepository : ITransactionRepository
     public async Task UpdateAsync(Transaction transaction, CancellationToken cancellationToken = default)
     {
         _context.Transactions.Update(transaction);
-        await _context.SaveChangesAsync(cancellationToken);
     }
 }

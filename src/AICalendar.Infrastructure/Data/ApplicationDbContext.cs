@@ -1,6 +1,7 @@
 using AICalendar.Domain.Entities;
 using AICalendar.Domain.Interfaces;
 using AICalendar.Infrastructure.Data.SeedData;
+using AICalendar.Infrastructure.Outbox;
 using AICalendar.Infrastructure.Persistence.Configurations;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,6 +16,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
 
     public DbSet<User> Users => Set<User>();
     public DbSet<Transaction> Transactions => Set<Transaction>();
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -23,6 +25,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
         // Apply configurations
         modelBuilder.ApplyConfiguration(new UserConfiguration());
         modelBuilder.ApplyConfiguration(new TransactionConfiguration());
+        modelBuilder.ApplyConfiguration(new OutboxConfiguration());
 
         // Seed data
         UserTransactionSeedData.SeedUserAndTransactionData(modelBuilder);

@@ -48,9 +48,19 @@ builder.Services.AddSwaggerGen(c =>
     }
 });
 
-// Configure DbContext
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+// Configure DbContext with Interceptors
+builder.Services.AddSingleton<AICalendar.Infrastructure.Persistence.Interceptors.OutboxInterceptor>();
+
+builder.Services.AddDbContext<ApplicationDbContext>((serviceProvider, options) =>
+{
+    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+
+    options.UseSqlServer(connectionString);
+
+    // Add OutboxInterceptor for automatic domain event conversion
+    var outboxInterceptor = serviceProvider.GetRequiredService<AICalendar.Infrastructure.Persistence.Interceptors.OutboxInterceptor>();
+    options.AddInterceptors(outboxInterceptor);
+});
 
 // Register Repositories
 builder.Services.AddScoped<ITransactionRepository, TransactionRepository>();
@@ -73,6 +83,10 @@ builder.Services.AddMediatR(cfg =>
 builder.Services.AddValidatorsFromAssembly(typeof(AICalendar.Application.AssemblyReference).Assembly);
 
 // Register background jobs for Hangfire
+builder.Services.AddScoped<AICalendar.Infrastructure.Outbox.OutboxProcessorJob>();
+builder.Services.AddScoped<AICalendar.Infrastructure.BackgroundJobs.CleanupOutboxJob>();
+builder.Services.AddScoped<AICalendar.Application.BackgroundJobs.BatchPredictionJob>();
+builder.Services.AddScoped<AICalendar.Application.BackgroundJobs.SendRemindersJob>();
 builder.Services.AddScoped<CleanupExpiredPredictionsJob>();
 
 // Configure Hangfire for background job processing

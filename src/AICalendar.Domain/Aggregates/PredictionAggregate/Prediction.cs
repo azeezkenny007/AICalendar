@@ -10,7 +10,6 @@ public class Prediction : AggregateRoot<PredictionId>
 {
     private readonly List<PredictionItem> _items = new();
 
-    public PredictionId PredictionId { get; private set; } = default!;
     public UserId UserId { get; private set; } = default!;
     public PredictionCycle Cycle { get; private set; } = default!;
     public PredictionStatus Status { get; private set; }
@@ -24,7 +23,7 @@ public class Prediction : AggregateRoot<PredictionId>
 
     private Prediction(UserId userId, PredictionCycle cycle)
     {
-        PredictionId = PredictionId.Create();
+        Id = PredictionId.Create();
         UserId = userId;
         Cycle = cycle;
         Status = PredictionStatus.Pending;
@@ -65,7 +64,7 @@ public class Prediction : AggregateRoot<PredictionId>
         UpdatedAt = DateTime.UtcNow;
 
         AddDomainEvent(new PredictionGeneratedEvent(
-            PredictionId,
+            Id,
             UserId,
             Cycle,
             _items.Count,
@@ -93,7 +92,7 @@ public class Prediction : AggregateRoot<PredictionId>
         UpdatedAt = DateTime.UtcNow;
 
         AddDomainEvent(new PredictionAcceptedEvent(
-            PredictionId,
+            Id,
             itemId,
             UserId,
             item.Merchant,
@@ -128,7 +127,7 @@ public class Prediction : AggregateRoot<PredictionId>
         UpdatedAt = DateTime.UtcNow;
 
         AddDomainEvent(new PredictionRejectedEvent(
-            PredictionId,
+            Id,
             itemId,
             UserId,
             item.Merchant,
@@ -167,7 +166,7 @@ public class Prediction : AggregateRoot<PredictionId>
         UpdatedAt = DateTime.UtcNow;
 
         AddDomainEvent(new PredictionItemEditedEvent(
-            PredictionId,
+            Id,
             itemId,
             UserId,
             merchant,

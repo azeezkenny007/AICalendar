@@ -64,6 +64,7 @@ builder.Services.AddDbContext<ApplicationDbContext>((serviceProvider, options) =
 
 // Register Repositories
 builder.Services.AddScoped<ITransactionRepository, TransactionRepository>();
+builder.Services.AddScoped<IPredictionRepository, PredictionRepository>();
 
 // Register UnitOfWork
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();

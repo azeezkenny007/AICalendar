@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace AICalendar.Domain.ValueObjects;
 
 public record PredictionId
@@ -6,7 +8,8 @@ public record PredictionId
 
     private PredictionId() { }
 
-    private PredictionId(Guid value)
+    [JsonConstructor]
+    public PredictionId(Guid value)
     {
         if (value == Guid.Empty)
             throw new ArgumentException("PredictionId cannot be empty", nameof(value));

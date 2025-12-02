@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace AICalendar.Domain.ValueObjects;
 
 public record UserId
@@ -7,7 +9,8 @@ public record UserId
     // EF Core needs a parameterless constructor
     private UserId() { }
 
-    private UserId(Guid value)
+    [JsonConstructor]
+    public UserId(Guid value)
     {
         Value = value;
     }

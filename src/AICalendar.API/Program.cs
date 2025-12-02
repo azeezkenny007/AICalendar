@@ -62,8 +62,11 @@ builder.Services.AddDbContext<ApplicationDbContext>((serviceProvider, options) =
     options.AddInterceptors(outboxInterceptor);
 });
 
+builder.Services.AddScoped<IApplicationDbContext>(provider => provider.GetRequiredService<ApplicationDbContext>());
+
 // Register Repositories
 builder.Services.AddScoped<ITransactionRepository, TransactionRepository>();
+builder.Services.AddScoped<IPredictionRepository, PredictionRepository>();
 
 // Register UnitOfWork
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();

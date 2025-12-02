@@ -6,6 +6,8 @@ using AICalendar.Application.Calendar.Queries.GetCalendarPredictions;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
+// dummy code
+
 namespace AICalendar.API.Controllers;
 
 [ApiController]

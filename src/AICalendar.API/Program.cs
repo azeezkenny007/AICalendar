@@ -34,19 +34,32 @@ builder.Services.AddSwaggerGen(c =>
     {
         Title = "AICalendar API",
         Version = "v1",
-        Description = "AI-powered calendar and prediction API",
+        Description = @"AI-powered calendar and prediction API with intelligent payment tracking and forecasting.
+
+## Features
+- **Predictions**: AI-generated payment predictions from transaction history
+- **Calendar**: Manage scheduled payments with due dates and tracking
+- **Health Monitoring**: Comprehensive health checks for all infrastructure components
+
+## Caching
+Calendar endpoints use Redis caching for improved performance (1-hour TTL).
+Cache is automatically invalidated on data modifications.",
         Contact = new Microsoft.OpenApi.Models.OpenApiContact
         {
             Name = "AICalendar Team"
         }
     });
-    // Include XML comments if available
+
+    // Include XML comments for better documentation
     var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
     if (File.Exists(xmlPath))
     {
-        c.IncludeXmlComments(xmlPath);
+        c.IncludeXmlComments(xmlPath, includeControllerXmlComments: true);
     }
+
+    // Order actions by API path for better organization
+    c.OrderActionsBy(apiDesc => $"{apiDesc.ActionDescriptor.RouteValues["controller"]}_{apiDesc.RelativePath}");
 });
 
 // Configure DbContext with Interceptors

@@ -1,3 +1,4 @@
+using AICalendar.Application.Common.Interfaces;
 using AICalendar.Application.Common.Notifications;
 using AICalendar.Domain.Events;
 using AICalendar.Domain.Interfaces;
@@ -11,15 +12,18 @@ public class PredictionAcceptedCalendarHandler : INotificationHandler<DomainEven
 {
     private readonly ICalendarRepository _calendarRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ICacheService _cacheService;
     private readonly ILogger<PredictionAcceptedCalendarHandler> _logger;
 
     public PredictionAcceptedCalendarHandler(
         ICalendarRepository calendarRepository,
         IUnitOfWork unitOfWork,
+        ICacheService cacheService,
         ILogger<PredictionAcceptedCalendarHandler> logger)
     {
         _calendarRepository = calendarRepository;
         _unitOfWork = unitOfWork;
+        _cacheService = cacheService;
         _logger = logger;
     }
 
@@ -73,6 +77,10 @@ public class PredictionAcceptedCalendarHandler : INotificationHandler<DomainEven
 
         // Save changes (this will also trigger OutboxInterceptor to save domain events)
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // Invalidate cache for this user's calendar
+        var cacheKey = $"calendar:user:{domainEvent.UserId.Value}";
+        await _cacheService.RemoveAsync(cacheKey);
 
         _logger.LogInformation(
             "CALENDAR: Successfully processed {Count} items for user {UserId}",

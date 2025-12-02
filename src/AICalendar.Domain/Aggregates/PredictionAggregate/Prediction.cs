@@ -74,69 +74,95 @@ public class Prediction : AggregateRoot<PredictionId>
         return Result.Success();
     }
 
-    public Result AcceptItem(PredictionItemId itemId)
+    public Result AcceptItems(List<PredictionItemId> itemIds)
     {
-        var item = _items.FirstOrDefault(x => x.Id.Value == itemId.Value);
-        if (item == null)
+        var acceptedDetails = new List<AcceptedItemDetails>();
+
+        foreach (var itemId in itemIds)
         {
-            return Result.Failure("Item not found.");
+            var item = _items.FirstOrDefault(i => i.Id == itemId);
+            if (item == null)
+            {
+                return Result.Failure($"Prediction item with ID {itemId.Value} not found.");
+            }
+
+            if (item.IsAccepted.HasValue)
+            {
+                var status = item.IsAccepted.Value ? "Accepted" : "Rejected";
+                return Result.Failure($"Item {itemId.Value} is already {status}.");
+            }
+
+            item.Accept();
+            acceptedDetails.Add(new AcceptedItemDetails(
+                item.Id,
+                item.Merchant,
+                item.Amount,
+                item.DueDate,
+                item.IsEdited,
+                item.OriginalAmount ?? item.Amount,
+                item.OriginalDueDate ?? item.DueDate
+            ));
         }
 
-        if (Status == PredictionStatus.Expired || Status == PredictionStatus.Failed)
+        if (acceptedDetails.Any())
         {
-            return Result.Failure($"Cannot accept items when status is {Status}");
+            Status = PredictionStatus.Reviewing;
+            UpdatedAt = DateTime.UtcNow;
+
+            AddDomainEvent(new PredictionBatchAcceptedEvent(
+                Id,
+                UserId,
+                acceptedDetails,
+                DateTime.UtcNow
+            ));
+
+            CheckIfCompleted();
         }
-
-        item.Accept();
-        Status = PredictionStatus.Reviewing;
-        UpdatedAt = DateTime.UtcNow;
-
-        AddDomainEvent(new PredictionAcceptedEvent(
-            Id,
-            itemId,
-            UserId,
-            item.Merchant,
-            item.Amount,
-            item.DueDate,
-            item.IsEdited,
-            item.OriginalAmount,
-            item.OriginalDueDate,
-            DateTime.UtcNow
-        ));
-
-        CheckIfCompleted();
 
         return Result.Success();
     }
 
-    public Result RejectItem(PredictionItemId itemId)
+    public Result RejectItems(List<PredictionItemId> itemIds)
     {
-        var item = _items.FirstOrDefault(x => x.Id.Value == itemId.Value);
-        if (item == null)
+        var rejectedDetails = new List<RejectedItemDetails>();
+
+        foreach (var itemId in itemIds)
         {
-            return Result.Failure("Item not found.");
+            var item = _items.FirstOrDefault(i => i.Id == itemId);
+            if (item == null)
+            {
+                return Result.Failure($"Prediction item with ID {itemId.Value} not found.");
+            }
+
+            if (item.IsAccepted.HasValue)
+            {
+                var status = item.IsAccepted.Value ? "Accepted" : "Rejected";
+                return Result.Failure($"Item {itemId.Value} is already {status}.");
+            }
+
+            item.Reject();
+            rejectedDetails.Add(new RejectedItemDetails(
+                item.Id,
+                item.Merchant,
+                item.Amount,
+                item.DueDate
+            ));
         }
 
-        if (Status == PredictionStatus.Expired || Status == PredictionStatus.Failed)
+        if (rejectedDetails.Any())
         {
-            return Result.Failure($"Cannot reject items when status is {Status}");
+            Status = PredictionStatus.Reviewing;
+            UpdatedAt = DateTime.UtcNow;
+
+            AddDomainEvent(new PredictionBatchRejectedEvent(
+                Id,
+                UserId,
+                rejectedDetails,
+                DateTime.UtcNow
+            ));
+
+            CheckIfCompleted();
         }
-
-        item.Reject();
-        Status = PredictionStatus.Reviewing;
-        UpdatedAt = DateTime.UtcNow;
-
-        AddDomainEvent(new PredictionRejectedEvent(
-            Id,
-            itemId,
-            UserId,
-            item.Merchant,
-            item.Amount,
-            item.DueDate,
-            DateTime.UtcNow
-        ));
-
-        CheckIfCompleted();
 
         return Result.Success();
     }

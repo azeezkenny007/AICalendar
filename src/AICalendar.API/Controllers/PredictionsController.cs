@@ -1,6 +1,4 @@
-using AICalendar.Application.Predictions.Commands.AcceptPredictionItem;
 using AICalendar.Application.Predictions.Commands.EditPredictionItem;
-using AICalendar.Application.Predictions.Commands.RejectPredictionItem;
 using AICalendar.Application.Predictions.Queries.GetPrediction;
 using AICalendar.Domain.ValueObjects;
 using MediatR;
@@ -28,28 +26,15 @@ public class PredictionsController : ControllerBase
         return result.IsSuccess ? Ok(result.Value) : NotFound(result.Error);
     }
 
-    [HttpPost("items/{itemId:guid}/accept")]
-    public async Task<IActionResult> AcceptItem(Guid itemId)
+    [HttpGet("user/{userId:guid}")]
+    public async Task<IActionResult> GetUserPredictions(Guid userId)
     {
-        var command = new AcceptPredictionItemCommand(
-            PredictionItemId.Create(itemId)
+        var query = new AICalendar.Application.Predictions.Queries.GetUserPredictions.GetUserPredictionsQuery(
+            UserId.Create(userId)
         );
+        var result = await _mediator.Send(query);
 
-        var result = await _mediator.Send(command);
-
-        return result.IsSuccess ? Ok() : BadRequest(result.Error);
-    }
-
-    [HttpPost("items/{itemId:guid}/reject")]
-    public async Task<IActionResult> RejectItem(Guid itemId)
-    {
-        var command = new RejectPredictionItemCommand(
-            PredictionItemId.Create(itemId)
-        );
-
-        var result = await _mediator.Send(command);
-
-        return result.IsSuccess ? Ok() : BadRequest(result.Error);
+        return result.IsSuccess ? Ok(result.Value) : NotFound(result.Error);
     }
 
     [HttpPut("items/{itemId:guid}")]
@@ -67,19 +52,30 @@ public class PredictionsController : ControllerBase
         return result.IsSuccess ? Ok() : BadRequest(result.Error);
     }
 
+    [HttpPost("batch-process")]
+    public async Task<IActionResult> BatchProcess([FromBody] BatchProcessRequest request)
+    {
+        var command = new AICalendar.Application.Predictions.Commands.BatchProcessPredictionItems.BatchProcessPredictionItemsCommand(
+            request.AcceptedItemIds.Select(id => PredictionItemId.Create(id)).ToList(),
+            request.RejectedItemIds.Select(id => PredictionItemId.Create(id)).ToList()
+        );
+
+        var result = await _mediator.Send(command);
+
+        return result.IsSuccess ? Ok() : BadRequest(result.Error);
+    }
+
     [HttpPost("test-seed")]
     public async Task<IActionResult> CreateTestPrediction()
     {
-        // Use a dummy user ID for testing
-        var userId = AICalendar.Domain.ValueObjects.UserId.Create(Guid.Parse("11111111-1111-1111-1111-111111111111"));
-
-        var command = new AICalendar.Application.Predictions.Commands.CreateTestPrediction.CreateTestPredictionCommand(userId);
+        var command = new AICalendar.Application.Predictions.Commands.CreateTestPrediction.CreateTestPredictionCommand();
         var result = await _mediator.Send(command);
 
         return result.IsSuccess
-            ? Ok(new { PredictionId = result.Value.Value })
+            ? Ok(result.Value)
             : BadRequest(result.Error);
     }
 }
 
 public record EditItemRequest(string Merchant, decimal Amount, DateTime DueDate);
+public record BatchProcessRequest(List<Guid> AcceptedItemIds, List<Guid> RejectedItemIds);

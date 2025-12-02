@@ -4,6 +4,6 @@ using MediatR;
 
 namespace AICalendar.Application.Predictions.Commands.CreateTestPrediction;
 
-public record CreateTestPredictionCommand(
-    UserId UserId
-) : IRequest<Result<PredictionId>>;
+public record CreateTestPredictionCommand() : IRequest<Result<TestPredictionResult>>;
+
+public record TestPredictionResult(Guid PredictionId, Guid UserId);

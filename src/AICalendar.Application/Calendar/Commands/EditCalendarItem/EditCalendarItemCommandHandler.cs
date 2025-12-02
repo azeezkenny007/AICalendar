@@ -1,3 +1,4 @@
+using AICalendar.Application.Common.Interfaces;
 using AICalendar.Domain.Common;
 using AICalendar.Domain.Interfaces;
 using AICalendar.Domain.Services;
@@ -11,17 +12,20 @@ public class EditCalendarItemCommandHandler : IRequestHandler<EditCalendarItemCo
     private readonly ICalendarRepository _calendarRepository;
     private readonly ICalendarDomainService _calendarDomainService;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ICacheService _cacheService;
     private readonly ILogger<EditCalendarItemCommandHandler> _logger;
 
     public EditCalendarItemCommandHandler(
         ICalendarRepository calendarRepository,
         ICalendarDomainService calendarDomainService,
         IUnitOfWork unitOfWork,
+        ICacheService cacheService,
         ILogger<EditCalendarItemCommandHandler> logger)
     {
         _calendarRepository = calendarRepository;
         _calendarDomainService = calendarDomainService;
         _unitOfWork = unitOfWork;
+        _cacheService = cacheService;
         _logger = logger;
     }
 
@@ -73,6 +77,10 @@ public class EditCalendarItemCommandHandler : IRequestHandler<EditCalendarItemCo
         }
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // Invalidate cache for this user's calendar
+        var cacheKey = $"calendar:user:{calendar.UserId.Value}";
+        await _cacheService.RemoveAsync(cacheKey);
 
         _logger.LogInformation(
             "Calendar item {ItemId} updated: {Merchant} - ${Amount} due on {DueDate}",

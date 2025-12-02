@@ -10,8 +10,12 @@ using Hangfire.Storage;
 
 namespace AICalendar.API.Controllers;
 
+/// <summary>
+/// Provides health check endpoints for monitoring application and infrastructure status
+/// </summary>
 [ApiController]
 [Route("[controller]")]
+[Produces("application/json")]
 public class HealthController : ControllerBase
 {
     private readonly ILogger<HealthController> _logger;
@@ -35,10 +39,21 @@ public class HealthController : ControllerBase
     }
 
     /// <summary>
-    /// Simple health check - just returns OK
-    /// Used by Docker healthcheck
+    /// Basic health check endpoint that returns OK if the API is running
     /// </summary>
+    /// <returns>Health status with timestamp</returns>
+    /// <response code="200">API is running and responsive</response>
+    /// <remarks>
+    /// Sample request:
+    ///
+    ///     GET /health
+    ///
+    /// This lightweight endpoint is used by Docker healthchecks and load balancers.
+    /// It only verifies the API process is running, not infrastructure dependencies.
+    /// For detailed infrastructure checks, use GET /health/detailed
+    /// </remarks>
     [HttpGet]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     public IActionResult Get()
     {
         return Ok(new
@@ -49,10 +64,27 @@ public class HealthController : ControllerBase
     }
 
     /// <summary>
-    /// Detailed health check - checks all dependencies
-    /// Use this for monitoring
+    /// Comprehensive health check that verifies all infrastructure dependencies
     /// </summary>
+    /// <returns>Detailed health status for all system components</returns>
+    /// <response code="200">All systems are healthy</response>
+    /// <response code="503">One or more systems are unhealthy (service unavailable)</response>
+    /// <remarks>
+    /// Sample request:
+    ///
+    ///     GET /health/detailed
+    ///
+    /// This endpoint checks:
+    /// - Database connectivity (PostgreSQL)
+    /// - Redis cache connectivity (if configured)
+    /// - API internal services and DI container
+    /// - Hangfire background job server
+    ///
+    /// Use this for monitoring dashboards and alerting systems.
+    /// </remarks>
     [HttpGet("detailed")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
     public async Task<IActionResult> GetDetailed()
     {
         var databaseStatus = await CheckDatabase();
@@ -84,9 +116,24 @@ public class HealthController : ControllerBase
     }
 
     /// <summary>
-    /// Test the cache service specifically
+    /// Tests the cache service functionality with read/write operations
     /// </summary>
+    /// <returns>Cache test results with operation status</returns>
+    /// <response code="200">Cache operations completed (check status field for success/failure)</response>
+    /// <remarks>
+    /// Sample request:
+    ///
+    ///     GET /health/cache-test
+    ///
+    /// This endpoint performs three cache operations:
+    /// 1. SetAsync - Writes a test value to cache
+    /// 2. GetAsync - Retrieves the written value
+    /// 3. GetOrSetAsync - Tests the cache-or-create pattern
+    ///
+    /// Use this for diagnosing cache issues in development/staging environments.
+    /// </remarks>
     [HttpGet("cache-test")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> TestCache()
     {
         var key = $"health_check_{Guid.NewGuid()}";

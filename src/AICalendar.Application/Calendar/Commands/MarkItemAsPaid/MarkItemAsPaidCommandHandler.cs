@@ -1,3 +1,4 @@
+using AICalendar.Application.Common.Interfaces;
 using AICalendar.Domain.Common;
 using AICalendar.Domain.Interfaces;
 using MediatR;
@@ -9,15 +10,18 @@ public class MarkItemAsPaidCommandHandler : IRequestHandler<MarkItemAsPaidComman
 {
     private readonly ICalendarRepository _calendarRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ICacheService _cacheService;
     private readonly ILogger<MarkItemAsPaidCommandHandler> _logger;
 
     public MarkItemAsPaidCommandHandler(
         ICalendarRepository calendarRepository,
         IUnitOfWork unitOfWork,
+        ICacheService cacheService,
         ILogger<MarkItemAsPaidCommandHandler> logger)
     {
         _calendarRepository = calendarRepository;
         _unitOfWork = unitOfWork;
+        _cacheService = cacheService;
         _logger = logger;
     }
 
@@ -39,6 +43,10 @@ public class MarkItemAsPaidCommandHandler : IRequestHandler<MarkItemAsPaidComman
         }
 
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // Invalidate cache for this user's calendar
+        var cacheKey = $"calendar:user:{calendar.UserId.Value}";
+        await _cacheService.RemoveAsync(cacheKey);
 
         _logger.LogInformation(
             "Calendar item {ItemId} marked as paid on {PaidDate}",

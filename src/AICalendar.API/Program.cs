@@ -1,6 +1,7 @@
 using AICalendar.API.Middleware;
 using AICalendar.Application.Common.Behaviors;
 using AICalendar.Domain.Interfaces;
+using AICalendar.Domain.Services;
 using AICalendar.Infrastructure.Data;
 using AICalendar.Infrastructure.Persistence.Repositories;
 using AICalendar.Infrastructure.Persistence.UnitOfWork;
@@ -67,6 +68,10 @@ builder.Services.AddScoped<IApplicationDbContext>(provider => provider.GetRequir
 // Register Repositories
 builder.Services.AddScoped<ITransactionRepository, TransactionRepository>();
 builder.Services.AddScoped<IPredictionRepository, PredictionRepository>();
+builder.Services.AddScoped<ICalendarRepository, CalendarRepository>();
+
+// Register Domain Services
+builder.Services.AddScoped<ICalendarDomainService, CalendarDomainService>();
 
 // Register UnitOfWork
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();

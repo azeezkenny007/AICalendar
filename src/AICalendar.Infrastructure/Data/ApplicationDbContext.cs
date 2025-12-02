@@ -1,3 +1,4 @@
+using AICalendar.Domain.Aggregates.CalendarAggregate;
 using AICalendar.Domain.Aggregates.PredictionAggregate;
 using AICalendar.Domain.Entities;
 using AICalendar.Domain.Interfaces;
@@ -19,6 +20,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<User> Users => Set<User>();
     public DbSet<Transaction> Transactions => Set<Transaction>();
     public DbSet<Prediction> Predictions => Set<Prediction>();
+    public DbSet<Calendar> Calendars => Set<Calendar>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -31,11 +33,14 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
         modelBuilder.Ignore<UserId>();
         modelBuilder.Ignore<PredictionCycle>();
         modelBuilder.Ignore<ConfidenceScore>();
+        modelBuilder.Ignore<CalendarId>();
+        modelBuilder.Ignore<CalendarItemId>();
 
         // Apply configurations
         modelBuilder.ApplyConfiguration(new UserConfiguration());
         modelBuilder.ApplyConfiguration(new TransactionConfiguration());
         modelBuilder.ApplyConfiguration(new PredictionConfiguration());
+        modelBuilder.ApplyConfiguration(new CalendarConfiguration());
         modelBuilder.ApplyConfiguration(new OutboxConfiguration());
 
         // Seed data

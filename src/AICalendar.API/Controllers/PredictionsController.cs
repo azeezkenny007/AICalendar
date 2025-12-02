@@ -1,94 +1,121 @@
-using AICalendar.Application.Predictions.Commands.BatchProcessPredictionItems;
-using AICalendar.Application.Predictions.Commands.CreateTestPrediction;
-using AICalendar.Application.Predictions.Commands.EditPredictionItem;
-using AICalendar.Application.Predictions.Queries.GetPrediction;
-using AICalendar.Application.Predictions.Queries.GetUserPredictions;
-using AICalendar.Domain.ValueObjects;
+using AICalendar.Application.Calendar.Commands.DiscardPrediction;
+using AICalendar.Application.Calendar.Commands.EditTransaction;
+using AICalendar.Application.Calendar.Commands.KeepPrediction;
+using AICalendar.Application.Calendar.DTOs;
+using AICalendar.Application.Calendar.Queries.GetCalendarPredictions;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AICalendar.API.Controllers;
 
 [ApiController]
-[Route("api/predictions")]
+[Route("api/[controller]")]
+[Produces("application/json")]
 public class PredictionsController : ControllerBase
 {
     private readonly IMediator _mediator;
+    private readonly ILogger<PredictionsController> _logger;
 
-    public PredictionsController(IMediator mediator)
+    public PredictionsController(IMediator mediator, ILogger<PredictionsController> logger)
     {
         _mediator = mediator;
+        _logger = logger;
     }
 
-    [HttpGet("{predictionId:guid}")]
-    public async Task<IActionResult> GetPrediction(Guid predictionId)
+    /// <summary>
+    /// Get AI-generated calendar predictions for a user
+    /// </summary>
+    /// <param name="userId">User ID</param>
+    /// <returns>List of predicted transactions with AI analysis</returns>
+    /// <response code="200">Returns the calendar predictions</response>
+    /// <response code="404">User has no transactions</response>
+    [HttpGet("predictions/{userId:guid}")]
+    [ProducesResponseType(typeof(CalendarPredictionResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetCalendarPredictions(Guid userId)
     {
-        var query = new GetPredictionQuery(PredictionId.Create(predictionId));
+        _logger.LogInformation("Getting calendar predictions for user {UserId}", userId);
+
+        var query = new GetCalendarPredictionsQuery(userId);
         var result = await _mediator.Send(query);
 
-        return result.IsSuccess ? Ok(result.Value) : NotFound(result.Error);
+        if (!result.IsSuccess)
+        {
+            return NotFound(new { message = result.Error });
+        }
+
+        return Ok(result.Value);
     }
 
-    [HttpGet("user/{userId:guid}")]
-    public async Task<IActionResult> GetUserPredictions(Guid userId)
+    /// <summary>
+    /// Mark a prediction as kept (user accepts the prediction)
+    /// </summary>
+    /// <param name="transactionId">Transaction ID from the prediction</param>
+    /// <returns>Success status</returns>
+    /// <response code="200">Prediction marked as kept</response>
+    [HttpPut("keep/{transactionId:guid}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> KeepPrediction(Guid transactionId)
     {
-        var query = new GetUserPredictionsQuery(
-            UserId.Create(userId)
-        );
-        var result = await _mediator.Send(query);
+        _logger.LogInformation("Keeping prediction for transaction {TransactionId}", transactionId);
 
-        return result.IsSuccess ? Ok(result.Value) : NotFound(result.Error);
-    }
-
-    [HttpPut("items/{itemId:guid}")]
-    public async Task<IActionResult> EditItem(Guid itemId, [FromBody] EditItemRequest request)
-    {
-        var command = new EditPredictionItemCommand(
-            PredictionItemId.Create(itemId),
-            request.Merchant,
-            request.Amount,
-            request.DueDate,
-            request.Account,
-            request.AccountName,
-            request.Description
-        );
-
+        var command = new KeepPredictionCommand(transactionId);
         var result = await _mediator.Send(command);
 
-        return result.IsSuccess ? Ok() : BadRequest(result.Error);
+        if (!result.IsSuccess)
+        {
+            return BadRequest(new { message = result.Error });
+        }
+
+        return Ok(new { message = "Prediction marked as kept", transactionId });
     }
 
-    [HttpPost("batch-process")]
-    public async Task<IActionResult> BatchProcess([FromBody] BatchProcessRequest request)
+    /// <summary>
+    /// Mark a prediction as discarded (user rejects the prediction)
+    /// </summary>
+    /// <param name="transactionId">Transaction ID from the prediction</param>
+    /// <returns>Success status</returns>
+    /// <response code="200">Prediction marked as discarded</response>
+    [HttpPut("discard/{transactionId:guid}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<IActionResult> DiscardPrediction(Guid transactionId)
     {
-        var command = new BatchProcessPredictionItemsCommand(
-            request.AcceptedItemIds.Select(id => PredictionItemId.Create(id)).ToList(),
-            request.RejectedItemIds.Select(id => PredictionItemId.Create(id)).ToList()
-        );
+        _logger.LogInformation("Discarding prediction for transaction {TransactionId}", transactionId);
 
+        var command = new DiscardPredictionCommand(transactionId);
         var result = await _mediator.Send(command);
 
-        return result.IsSuccess ? Ok() : BadRequest(result.Error);
+        if (!result.IsSuccess)
+        {
+            return BadRequest(new { message = result.Error });
+        }
+
+        return Ok(new { message = "Prediction marked as discarded", transactionId });
     }
 
-    [HttpPost("test-seed")]
-    public async Task<IActionResult> CreateTestPrediction()
+    /// <summary>
+    /// Edit the transaction associated with a prediction
+    /// </summary>
+    /// <param name="transactionId">Transaction ID to edit</param>
+    /// <param name="editData">Updated transaction data</param>
+    /// <returns>Success status</returns>
+    /// <response code="200">Transaction updated successfully</response>
+    /// <response code="404">Transaction not found</response>
+    [HttpPatch("edit/{transactionId:guid}")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> EditTransaction(Guid transactionId, [FromBody] EditTransactionDto editData)
     {
-        var command = new CreateTestPredictionCommand();
+        _logger.LogInformation("Editing transaction {TransactionId}", transactionId);
+
+        var command = new EditTransactionCommand(transactionId, editData);
         var result = await _mediator.Send(command);
 
-        return result.IsSuccess
-            ? Ok(result.Value)
-            : BadRequest(result.Error);
+        if (!result.IsSuccess)
+        {
+            return NotFound(new { message = result.Error });
+        }
+
+        return Ok(new { message = "Transaction updated and marked as edited", transactionId });
     }
 }
-
-public record EditItemRequest(
-    string? Merchant,
-    decimal? Amount,
-    DateTime? DueDate,
-    string? Account,
-    string? AccountName,
-    string? Description
-);
-public record BatchProcessRequest(List<Guid> AcceptedItemIds, List<Guid> RejectedItemIds);

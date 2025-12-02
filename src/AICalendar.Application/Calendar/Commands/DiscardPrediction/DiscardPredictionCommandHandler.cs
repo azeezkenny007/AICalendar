@@ -8,10 +8,12 @@ namespace AICalendar.Application.Calendar.Commands.DiscardPrediction;
 public class DiscardPredictionCommandHandler : IRequestHandler<DiscardPredictionCommand, Result<bool>>
 {
     private readonly ITransactionRepository _transactionRepository;
+    private readonly IUnitOfWork _unitOfWork;
 
-    public DiscardPredictionCommandHandler(ITransactionRepository transactionRepository)
+    public DiscardPredictionCommandHandler(ITransactionRepository transactionRepository, IUnitOfWork unitOfWork)
     {
         _transactionRepository = transactionRepository;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<bool>> Handle(DiscardPredictionCommand request, CancellationToken cancellationToken)
@@ -29,6 +31,7 @@ public class DiscardPredictionCommandHandler : IRequestHandler<DiscardPrediction
 
         // Save to database
         await _transactionRepository.UpdateAsync(transaction, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         // Update the in-memory status to "Discarded"
         PredictionStatusStore.SetStatus(request.TransactionId, "Discarded");

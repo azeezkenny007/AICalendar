@@ -9,10 +9,12 @@ namespace AICalendar.Application.Calendar.Commands.EditTransaction;
 public class EditTransactionCommandHandler : IRequestHandler<EditTransactionCommand, Result<bool>>
 {
     private readonly ITransactionRepository _transactionRepository;
+    private readonly IUnitOfWork _unitOfWork;
 
-    public EditTransactionCommandHandler(ITransactionRepository transactionRepository)
+    public EditTransactionCommandHandler(ITransactionRepository transactionRepository,IUnitOfWork unitOfWork)
     {
         _transactionRepository = transactionRepository;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<bool>> Handle(EditTransactionCommand request, CancellationToken cancellationToken)
@@ -46,6 +48,7 @@ public class EditTransactionCommandHandler : IRequestHandler<EditTransactionComm
 
         // Save the updated transaction
         await _transactionRepository.UpdateAsync(transaction, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
 
         // Mark the prediction as "Edited"
         PredictionStatusStore.SetStatus(request.TransactionId, "Edited");

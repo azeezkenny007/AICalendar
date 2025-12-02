@@ -36,7 +36,10 @@ public class GetPredictionQueryHandler : IRequestHandler<GetPredictionQuery, Res
                 i.Confidence.Value,
                 i.Pattern.ToString(),
                 i.IsAccepted,
-                i.IsEdited
+                i.IsEdited,
+                i.Account,
+                i.AccountName,
+                i.Description
             )).ToList()
         );
 

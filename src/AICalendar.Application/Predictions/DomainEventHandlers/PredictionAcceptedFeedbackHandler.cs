@@ -5,11 +5,11 @@ using Microsoft.Extensions.Logging;
 
 namespace AICalendar.Application.Predictions.DomainEventHandlers;
 
-public class PredictionBatchAcceptedEventHandler : INotificationHandler<DomainEventNotification<PredictionBatchAcceptedEvent>>
+public class PredictionAcceptedFeedbackHandler : INotificationHandler<DomainEventNotification<PredictionBatchAcceptedEvent>>
 {
-    private readonly ILogger<PredictionBatchAcceptedEventHandler> _logger;
+    private readonly ILogger<PredictionAcceptedFeedbackHandler> _logger;
 
-    public PredictionBatchAcceptedEventHandler(ILogger<PredictionBatchAcceptedEventHandler> logger)
+    public PredictionAcceptedFeedbackHandler(ILogger<PredictionAcceptedFeedbackHandler> logger)
     {
         _logger = logger;
     }
@@ -19,18 +19,16 @@ public class PredictionBatchAcceptedEventHandler : INotificationHandler<DomainEv
         var domainEvent = notification.DomainEvent;
 
         _logger.LogInformation(
-            "Handling batch acceptance for Prediction {PredictionId}. {Count} items accepted.",
+            "FEEDBACK: Handling batch acceptance for Prediction {PredictionId}. {Count} items accepted.",
             domainEvent.PredictionId.Value,
             domainEvent.Items.Count
         );
 
         foreach (var item in domainEvent.Items)
         {
-            // TODO: Add to Calendar (Create Transaction/CalendarEntry)
-            _logger.LogInformation("Adding item {ItemId} to Calendar: {Merchant} - {Amount}", item.ItemId.Value, item.Merchant, item.Amount);
-
+            Console.WriteLine(item);
             // TODO: Create UserFeedback (Positive)
-            _logger.LogInformation("Recording positive feedback for item {ItemId}", item.ItemId.Value);
+            _logger.LogInformation("FEEDBACK: Recording positive feedback for item {ItemId}", item.ItemId.Value);
         }
 
         return Task.CompletedTask;

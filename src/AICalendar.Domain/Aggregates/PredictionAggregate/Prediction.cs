@@ -167,7 +167,14 @@ public class Prediction : AggregateRoot<PredictionId>
         return Result.Success();
     }
 
-    public Result EditItem(PredictionItemId itemId, string merchant, decimal amount, DateTime dueDate)
+    public Result EditItem(
+        PredictionItemId itemId,
+        string? merchant,
+        decimal? amount,
+        DateTime? dueDate,
+        string? account,
+        string? accountName,
+        string? description)
     {
         var item = _items.FirstOrDefault(x => x.Id.Value == itemId.Value);
         if (item == null)
@@ -183,7 +190,23 @@ public class Prediction : AggregateRoot<PredictionId>
         var originalAmount = item.Amount;
         var originalDueDate = item.DueDate;
 
-        var result = item.Edit(merchant, amount, dueDate);
+        // Use existing values if new ones are null
+        var newMerchant = merchant ?? item.Merchant;
+        var newAmount = amount ?? item.Amount;
+        var newDueDate = dueDate ?? item.DueDate;
+        var newAccount = account ?? item.Account;
+        var newAccountName = accountName ?? item.AccountName;
+        var newDescription = description ?? item.Description;
+
+        var result = item.Edit(
+            newMerchant,
+            newAmount,
+            newDueDate,
+            newAccount,
+            newAccountName,
+            newDescription
+        );
+
         if (!result.IsSuccess)
         {
             return result;
@@ -191,17 +214,21 @@ public class Prediction : AggregateRoot<PredictionId>
 
         UpdatedAt = DateTime.UtcNow;
 
-        AddDomainEvent(new PredictionItemEditedEvent(
-            Id,
-            itemId,
-            UserId,
-            merchant,
-            originalAmount,
-            amount,
-            originalDueDate,
-            dueDate,
-            DateTime.UtcNow
-        ));
+        // Only raise event if something actually changed
+        if (merchant != null || amount != null || dueDate != null || account != null || accountName != null || description != null)
+        {
+            AddDomainEvent(new PredictionItemEditedEvent(
+                Id,
+                itemId,
+                UserId,
+                newMerchant,
+                originalAmount,
+                newAmount,
+                originalDueDate,
+                newDueDate,
+                DateTime.UtcNow
+            ));
+        }
 
         return Result.Success();
     }

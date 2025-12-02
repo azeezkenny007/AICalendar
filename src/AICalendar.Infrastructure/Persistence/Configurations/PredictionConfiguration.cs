@@ -72,6 +72,11 @@ public class PredictionConfiguration : IEntityTypeConfiguration<Prediction>
                 .IsRequired();
 
             item.Property(i => i.IsAccepted);
+
+            item.Property(i => i.Account).HasMaxLength(100);
+            item.Property(i => i.AccountName).HasMaxLength(200);
+            item.Property(i => i.Description).HasMaxLength(500);
+
             item.Property(i => i.IsEdited);
             item.Property(i => i.OriginalAmount).HasPrecision(18, 2);
             item.Property(i => i.OriginalDueDate);

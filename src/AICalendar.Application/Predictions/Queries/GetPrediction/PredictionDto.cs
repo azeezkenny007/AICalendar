@@ -19,5 +19,8 @@ public record PredictionItemDto(
     double Confidence,
     string Pattern,
     bool? IsAccepted,
-    bool IsEdited
+    bool IsEdited,
+    string? Account,
+    string? AccountName,
+    string? Description
 );

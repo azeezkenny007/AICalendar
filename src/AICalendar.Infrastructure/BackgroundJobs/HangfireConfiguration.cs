@@ -33,7 +33,7 @@ public static class HangfireConfiguration
 
         recurringJobManager.AddOrUpdate<OutboxProcessorJob>(
             "process-outbox-messages",
-            job => job.ProcessOutboxMessages(),
+            job => job.ProcessOutboxMessages("DomainEvents"),
             outboxCron,
             new RecurringJobOptions
             {

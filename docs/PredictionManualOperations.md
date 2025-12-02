@@ -95,12 +95,23 @@ curl -X POST "http://localhost:8080/api/predictions/batch-process" \
 ```
 
 ### Edit Item
+**Note: All fields are optional. You can update just one or multiple fields.**
+
 ```bash
+# Example: Update only the amount
+curl -X PUT "http://localhost:8080/api/predictions/items/{itemId}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "amount": 19.99
+  }'
+```
+
+```bash
+# Example: Update merchant and due date
 curl -X PUT "http://localhost:8080/api/predictions/items/{itemId}" \
   -H "Content-Type: application/json" \
   -d '{
     "merchant": "Netflix Premium",
-    "amount": 19.99,
     "dueDate": "2025-12-10T00:00:00Z"
   }'
 ```

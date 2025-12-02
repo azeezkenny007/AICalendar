@@ -15,6 +15,11 @@ public class PredictionItem : Entity<PredictionItemId>
     public PatternType Pattern { get; private set; }
     public bool? IsAccepted { get; private set; } // null = Pending, true = Accepted, false = Rejected
 
+    // New fields for Transfers/Bills
+    public string? Account { get; private set; }
+    public string? AccountName { get; private set; }
+    public string? Description { get; private set; }
+
     public bool IsEdited { get; private set; }
     public decimal? OriginalAmount { get; private set; }
     public DateTime? OriginalDueDate { get; private set; }
@@ -27,7 +32,10 @@ public class PredictionItem : Entity<PredictionItemId>
         DateTime dueDate,
         string explanation,
         ConfidenceScore confidence,
-        PatternType pattern)
+        PatternType pattern,
+        string? account = null,
+        string? accountName = null,
+        string? description = null)
         : base(id)
     {
         TransactionId = transactionId;
@@ -37,6 +45,9 @@ public class PredictionItem : Entity<PredictionItemId>
         Explanation = explanation;
         Confidence = confidence;
         Pattern = pattern;
+        Account = account;
+        AccountName = accountName;
+        Description = description;
     }
 
     // EF Core
@@ -49,12 +60,21 @@ public class PredictionItem : Entity<PredictionItemId>
         DateTime dueDate,
         string explanation,
         ConfidenceScore confidence,
-        PatternType pattern)
+        PatternType pattern,
+        string? account = null,
+        string? accountName = null,
+        string? description = null)
     {
-        return new PredictionItem(PredictionItemId.Create(), transactionId, merchant, amount, dueDate, explanation, confidence, pattern);
+        return new PredictionItem(PredictionItemId.Create(), transactionId, merchant, amount, dueDate, explanation, confidence, pattern, account, accountName, description);
     }
 
-    public Result Edit(string merchant, decimal amount, DateTime dueDate)
+    public Result Edit(
+        string merchant,
+        decimal amount,
+        DateTime dueDate,
+        string? account,
+        string? accountName,
+        string? description)
     {
         if (IsAccepted.HasValue)
         {
@@ -71,6 +91,9 @@ public class PredictionItem : Entity<PredictionItemId>
         Merchant = merchant;
         Amount = amount;
         DueDate = dueDate;
+        Account = account;
+        AccountName = accountName;
+        Description = description;
 
         return Result.Success();
     }

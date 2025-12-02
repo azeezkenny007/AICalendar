@@ -30,7 +30,7 @@ public class EditPredictionItemCommandHandler
             "Editing prediction item {ItemId}",
             request.ItemId
         );
-
+// just test
         var prediction = await _repository.GetByItemIdAsync(request.ItemId, ct);
 
         if (prediction == null)
@@ -42,7 +42,10 @@ public class EditPredictionItemCommandHandler
             request.ItemId,
             request.Merchant,
             request.Amount,
-            request.DueDate
+            request.DueDate,
+            request.Account,
+            request.AccountName,
+            request.Description
         );
 
         if (!result.IsSuccess)

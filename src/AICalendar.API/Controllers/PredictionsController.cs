@@ -1,5 +1,8 @@
+using AICalendar.Application.Predictions.Commands.BatchProcessPredictionItems;
+using AICalendar.Application.Predictions.Commands.CreateTestPrediction;
 using AICalendar.Application.Predictions.Commands.EditPredictionItem;
 using AICalendar.Application.Predictions.Queries.GetPrediction;
+using AICalendar.Application.Predictions.Queries.GetUserPredictions;
 using AICalendar.Domain.ValueObjects;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
@@ -29,7 +32,7 @@ public class PredictionsController : ControllerBase
     [HttpGet("user/{userId:guid}")]
     public async Task<IActionResult> GetUserPredictions(Guid userId)
     {
-        var query = new AICalendar.Application.Predictions.Queries.GetUserPredictions.GetUserPredictionsQuery(
+        var query = new GetUserPredictionsQuery(
             UserId.Create(userId)
         );
         var result = await _mediator.Send(query);
@@ -44,7 +47,10 @@ public class PredictionsController : ControllerBase
             PredictionItemId.Create(itemId),
             request.Merchant,
             request.Amount,
-            request.DueDate
+            request.DueDate,
+            request.Account,
+            request.AccountName,
+            request.Description
         );
 
         var result = await _mediator.Send(command);
@@ -55,7 +61,7 @@ public class PredictionsController : ControllerBase
     [HttpPost("batch-process")]
     public async Task<IActionResult> BatchProcess([FromBody] BatchProcessRequest request)
     {
-        var command = new AICalendar.Application.Predictions.Commands.BatchProcessPredictionItems.BatchProcessPredictionItemsCommand(
+        var command = new BatchProcessPredictionItemsCommand(
             request.AcceptedItemIds.Select(id => PredictionItemId.Create(id)).ToList(),
             request.RejectedItemIds.Select(id => PredictionItemId.Create(id)).ToList()
         );
@@ -68,7 +74,7 @@ public class PredictionsController : ControllerBase
     [HttpPost("test-seed")]
     public async Task<IActionResult> CreateTestPrediction()
     {
-        var command = new AICalendar.Application.Predictions.Commands.CreateTestPrediction.CreateTestPredictionCommand();
+        var command = new CreateTestPredictionCommand();
         var result = await _mediator.Send(command);
 
         return result.IsSuccess
@@ -77,5 +83,12 @@ public class PredictionsController : ControllerBase
     }
 }
 
-public record EditItemRequest(string Merchant, decimal Amount, DateTime DueDate);
+public record EditItemRequest(
+    string? Merchant,
+    decimal? Amount,
+    DateTime? DueDate,
+    string? Account,
+    string? AccountName,
+    string? Description
+);
 public record BatchProcessRequest(List<Guid> AcceptedItemIds, List<Guid> RejectedItemIds);

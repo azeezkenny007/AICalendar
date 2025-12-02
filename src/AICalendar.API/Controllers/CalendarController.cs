@@ -1,6 +1,7 @@
 using AICalendar.Application.Calendar.Commands.EditCalendarItem;
 using AICalendar.Application.Calendar.Commands.MarkItemAsPaid;
 using AICalendar.Application.Calendar.Queries.GetUserCalendar;
+using AICalendar.Domain.Common;
 using AICalendar.Domain.ValueObjects;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
@@ -71,8 +72,10 @@ public class CalendarController : ControllerBase
     /// All fields are required. This operation invalidates the calendar cache for the associated user.
     /// </remarks>
     [HttpPut("items/{itemId:guid}")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(SuccessResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status409Conflict)]
     public async Task<IActionResult> EditCalendarItem(Guid itemId, [FromBody] EditCalendarItemRequest request)
     {
         var command = new EditCalendarItemCommand(
@@ -87,7 +90,13 @@ public class CalendarController : ControllerBase
 
         var result = await _mediator.Send(command);
 
-        return result.IsSuccess ? Ok() : BadRequest(result.Error);
+        return result.StatusCode switch
+        {
+            200 => Ok(new SuccessResponse(result.Title!, result.Detail!, result.Data)),
+            404 => NotFound(new ErrorResponse(result.Title!, result.Error!, result.Detail!)),
+            409 => Conflict(new ErrorResponse(result.Title!, result.Error!, result.Detail!)),
+            _ => BadRequest(new ErrorResponse(result.Title!, result.Error!, result.Detail!))
+        };
     }
 
     /// <summary>
@@ -109,8 +118,9 @@ public class CalendarController : ControllerBase
     /// This operation updates the payment status and invalidates the calendar cache for the associated user.
     /// </remarks>
     [HttpPost("items/{itemId:guid}/mark-paid")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(SuccessResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ErrorResponse), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> MarkItemAsPaid(Guid itemId, [FromBody] MarkPaidRequest request)
     {
         var command = new MarkItemAsPaidCommand(
@@ -120,7 +130,12 @@ public class CalendarController : ControllerBase
 
         var result = await _mediator.Send(command);
 
-        return result.IsSuccess ? Ok() : BadRequest(result.Error);
+        return result.StatusCode switch
+        {
+            200 => Ok(new SuccessResponse(result.Title!, result.Detail!, result.Data)),
+            404 => NotFound(new ErrorResponse(result.Title!, result.Error!, result.Detail!)),
+            _ => BadRequest(new ErrorResponse(result.Title!, result.Error!, result.Detail!))
+        };
     }
 }
 
@@ -147,3 +162,19 @@ public record EditCalendarItemRequest(
 /// </summary>
 /// <param name="PaidDate">The date when the payment was made</param>
 public record MarkPaidRequest(DateTime PaidDate);
+
+/// <summary>
+/// Standard success response format
+/// </summary>
+/// <param name="Title">Short title of the success message</param>
+/// <param name="Message">Detailed success message</param>
+/// <param name="Data">Additional data related to the success (optional)</param>
+public record SuccessResponse(string Title, string Message, object? Data = null);
+
+/// <summary>
+/// Standard error response format
+/// </summary>
+/// <param name="Title">Short title of the error</param>
+/// <param name="Error">The error message from the domain/application layer</param>
+/// <param name="Detail">User-friendly explanation of the error</param>
+public record ErrorResponse(string Title, string Error, string Detail);

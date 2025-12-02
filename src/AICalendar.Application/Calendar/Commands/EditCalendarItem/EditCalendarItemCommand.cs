@@ -1,4 +1,4 @@
-using AICalendar.Domain.Common;
+using AICalendar.Application.Common.Models;
 using AICalendar.Domain.ValueObjects;
 using MediatR;
 
@@ -12,4 +12,4 @@ public record EditCalendarItemCommand(
     string? Account = null,
     string? AccountName = null,
     string? Description = null
-) : IRequest<Result>;
+) : IRequest<OperationResult>;

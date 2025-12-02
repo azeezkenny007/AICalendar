@@ -7,6 +7,8 @@ using AICalendar.Domain.ValueObjects;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
+// dummy code
+
 namespace AICalendar.API.Controllers;
 
 [ApiController]

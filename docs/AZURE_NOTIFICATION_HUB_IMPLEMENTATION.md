@@ -1,6 +1,6 @@
 # Azure Notification Hub Implementation Guide
 
-Complete step-by-step guide to implement push notifications using **Azure Notification Hub** (without Firebase dependency) in the AICalendar project.
+Complete step-by-step guide to implement push notifications using **Azure Notification Hub exclusively** (no Firebase dependency at all) in the AICalendar project.
 
 ---
 

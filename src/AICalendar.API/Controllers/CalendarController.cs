@@ -49,27 +49,31 @@ public class CalendarController : ControllerBase
     }
 
     /// <summary>
-    /// Updates an existing calendar item with new details
+    /// Updates an existing calendar item with new details (partial update supported)
     /// </summary>
     /// <param name="itemId">The unique identifier of the calendar item to edit</param>
-    /// <param name="request">The updated calendar item details</param>
+    /// <param name="request">The updated calendar item details (only provide fields you want to update)</param>
     /// <returns>Success status of the update operation</returns>
     /// <response code="200">If the calendar item was successfully updated. Cache is automatically invalidated.</response>
     /// <response code="400">If the update request is invalid or the item cannot be updated</response>
     /// <remarks>
-    /// Sample request:
+    /// Sample request (update only merchant and amount):
     ///
     ///     PUT /api/calendar/items/3fa85f64-5717-4562-b3fc-2c963f66afa6
     ///     {
-    ///       "merchant": "Netflix",
-    ///       "amount": 15.99,
-    ///       "dueDate": "2025-01-15T00:00:00Z",
-    ///       "account": "Credit Card",
-    ///       "accountName": "Chase Visa",
-    ///       "description": "Monthly subscription"
+    ///       "merchant": "Netflix Premium",
+    ///       "amount": 19.99
     ///     }
     ///
-    /// All fields are required. This operation invalidates the calendar cache for the associated user.
+    /// Sample request (update only due date):
+    ///
+    ///     PUT /api/calendar/items/3fa85f64-5717-4562-b3fc-2c963f66afa6
+    ///     {
+    ///       "dueDate": "2025-02-01T00:00:00Z"
+    ///     }
+    ///
+    /// All fields are optional. Only provide the fields you want to update.
+    /// At least one field must be provided. This operation invalidates the calendar cache for the associated user.
     /// </remarks>
     [HttpPut("items/{itemId:guid}")]
     [ProducesResponseType(typeof(SuccessResponse), StatusCodes.Status200OK)]
@@ -142,16 +146,16 @@ public class CalendarController : ControllerBase
 /// <summary>
 /// Request model for editing a calendar item
 /// </summary>
-/// <param name="Merchant">The merchant or payee name (required)</param>
-/// <param name="Amount">The payment amount in decimal format (required)</param>
-/// <param name="DueDate">The date when the payment is due (required)</param>
+/// <param name="Merchant">The merchant or payee name (optional - only provide fields you want to update)</param>
+/// <param name="Amount">The payment amount in decimal format (optional - only provide fields you want to update)</param>
+/// <param name="DueDate">The date when the payment is due (optional - only provide fields you want to update)</param>
 /// <param name="Account">The account used for payment (optional)</param>
 /// <param name="AccountName">The display name of the account (optional)</param>
 /// <param name="Description">Additional notes or description (optional)</param>
 public record EditCalendarItemRequest(
-    string Merchant,
-    decimal Amount,
-    DateTime DueDate,
+    string? Merchant = null,
+    decimal? Amount = null,
+    DateTime? DueDate = null,
     string? Account = null,
     string? AccountName = null,
     string? Description = null

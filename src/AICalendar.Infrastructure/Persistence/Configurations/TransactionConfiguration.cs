@@ -42,6 +42,14 @@ public class TransactionConfiguration : IEntityTypeConfiguration<Transaction>
         builder.Property(t => t.CreatedAt)
             .IsRequired();
 
+        builder.Property(t => t.ReceiverId)
+            .IsRequired(false)
+            .HasMaxLength(100);
+
+        builder.Property(t => t.MerchantId)
+            .IsRequired(false)
+            .HasMaxLength(100);
+
         builder.HasOne(t => t.User)
             .WithMany(u => u.Transactions)
             .HasForeignKey(t => t.UserId)

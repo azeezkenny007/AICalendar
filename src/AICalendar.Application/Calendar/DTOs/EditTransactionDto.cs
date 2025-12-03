@@ -27,4 +27,14 @@ public class EditTransactionDto
     /// Transaction date
     /// </summary>
     public DateTime? TransactionDate { get; set; }
+
+    /// <summary>
+    /// Receiver ID (for transfer transactions) or Transaction Type (for non-transfer)
+    /// </summary>
+    public string? ReceiverId { get; set; }
+
+    /// <summary>
+    /// Merchant ID (for non-transfer transactions only, null for transfers)
+    /// </summary>
+    public string? MerchantId { get; set; }
 }

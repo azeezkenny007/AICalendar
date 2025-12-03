@@ -91,6 +91,9 @@ public static class UserTransactionSeedData
                 // Spread transactions over 4 months (approximately 3 days apart)
                 var transactionDate = startDate.AddDays(i * 1.2);
 
+                // Set ReceiverId and MerchantId based on transaction type
+                var (receiverId, merchantId) = GetReceiverAndMerchantForType(randomType);
+
                 transactions.Add(new
                 {
                     Id = TransactionId.Create(transactionId),
@@ -101,7 +104,9 @@ public static class UserTransactionSeedData
                     TransactionDate = transactionDate,
                     CreatedAt = transactionDate,
                     IsKept = false,
-                    IsDiscarded = false
+                    IsDiscarded = false,
+                    ReceiverId = receiverId,
+                    MerchantId = merchantId
                 });
 
                 transactionCounter++;
@@ -175,4 +180,48 @@ public static class UserTransactionSeedData
     private static string GetRandomInsuranceType() => new[] { "Health Insurance", "Life Insurance", "Vehicle Insurance", "Property Insurance" }[new Random(Guid.NewGuid().GetHashCode()).Next(4)];
     private static string GetRandomVoucherType() => new[] { "Shopping Voucher", "Gift Voucher", "Discount Voucher", "Reward Points" }[new Random(Guid.NewGuid().GetHashCode()).Next(4)];
     private static string GetRandomDirectDebitType() => new[] { "Subscription Service", "Loan Repayment", "Insurance Premium", "Utility Bill" }[new Random(Guid.NewGuid().GetHashCode()).Next(4)];
+
+    private static (string? ReceiverId, string? MerchantId) GetReceiverAndMerchantForType(TransactionType type)
+    {
+        // For transfer types: ReceiverId = receiver name, MerchantId = null
+        // For other types: ReceiverId = transaction type, MerchantId = merchant name
+
+        if (type == TransactionType.TransferLocal || type == TransactionType.TransferInternational)
+        {
+            // Transfer transactions: set ReceiverId with receiver name, MerchantId is null
+            return (GetRandomReceiverName(), null);
+        }
+        else
+        {
+            // Non-transfer transactions: ReceiverId = transaction type, MerchantId = merchant name
+            return (type.ToString(), GetRandomMerchantName(type));
+        }
+    }
+
+    private static string GetRandomReceiverName() => new[]
+    {
+        "Adebayo Johnson", "Chioma Nwankwo", "Ibrahim Musa", "Funke Adeleke",
+        "Emeka Okafor", "Zainab Abubakar", "Tunde Williams", "Amina Hassan",
+        "Chinedu Eze", "Fatima Bello", "Segun Olawale", "Blessing Okoro"
+    }[new Random(Guid.NewGuid().GetHashCode()).Next(12)];
+
+    private static string GetRandomMerchantName(TransactionType type)
+    {
+        return type switch
+        {
+            TransactionType.BillPayment => new[] { "EKEDC", "IBEDC", "PHCN", "LAWMA", "Lagos Water Corporation" }[new Random(Guid.NewGuid().GetHashCode()).Next(5)],
+            TransactionType.AirtimeTopup => new[] { "MTN Nigeria", "Airtel Nigeria", "Glo Mobile", "9mobile" }[new Random(Guid.NewGuid().GetHashCode()).Next(4)],
+            TransactionType.DataPurchase => new[] { "MTN Data Services", "Airtel Data", "Glo Data", "9mobile Data" }[new Random(Guid.NewGuid().GetHashCode()).Next(4)],
+            TransactionType.LoanDisbursement => new[] { "Carbon Microfinance", "FairMoney", "Branch", "PalmCredit", "RenMoney" }[new Random(Guid.NewGuid().GetHashCode()).Next(5)],
+            TransactionType.LoanRepayment => new[] { "Carbon Microfinance", "FairMoney", "Branch", "PalmCredit", "RenMoney" }[new Random(Guid.NewGuid().GetHashCode()).Next(5)],
+            TransactionType.SavingsContribution => new[] { "PiggyVest", "Cowrywise", "Kuda Bank", "ALAT Savings" }[new Random(Guid.NewGuid().GetHashCode()).Next(4)],
+            TransactionType.InvestmentPurchase => new[] { "ARM Investment", "Stanbic IBTC", "Meristem Securities", "CardinalStone" }[new Random(Guid.NewGuid().GetHashCode()).Next(4)],
+            TransactionType.CardIssue => new[] { "GTBank Card Services", "Access Bank Cards", "First Bank Card Center", "UBA Card Division" }[new Random(Guid.NewGuid().GetHashCode()).Next(4)],
+            TransactionType.InsurancePayment => new[] { "AXA Mansard", "Old Mutual", "Leadway Assurance", "AIICO Insurance" }[new Random(Guid.NewGuid().GetHashCode()).Next(4)],
+            TransactionType.TravelBooking => new[] { "Wakanow", "TravelBeta", "Jumia Travel", "GIG Logistics" }[new Random(Guid.NewGuid().GetHashCode()).Next(4)],
+            TransactionType.VoucherRedeem => new[] { "Jumia", "Konga", "Slot", "ShopRite" }[new Random(Guid.NewGuid().GetHashCode()).Next(4)],
+            TransactionType.DirectDebit => new[] { "Netflix Nigeria", "DSTV", "Showmax", "Spotify Nigeria" }[new Random(Guid.NewGuid().GetHashCode()).Next(4)],
+            _ => "Unknown Merchant"
+        };
+    }
 }

@@ -46,6 +46,16 @@ public class EditTransactionCommandHandler : IRequestHandler<EditTransactionComm
             }
         }
 
+        if (request.EditData.ReceiverId != null)
+        {
+            transaction.UpdateReceiverId(request.EditData.ReceiverId);
+        }
+
+        if (request.EditData.MerchantId != null)
+        {
+            transaction.UpdateMerchantId(request.EditData.MerchantId);
+        }
+
         // Save the updated transaction
         await _transactionRepository.UpdateAsync(transaction, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);

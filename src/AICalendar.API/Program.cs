@@ -83,6 +83,8 @@ builder.Services.AddScoped<ITransactionRepository, TransactionRepository>();
 builder.Services.AddScoped<IPredictionRepository, PredictionRepository>();
 builder.Services.AddScoped<ICalendarRepository, CalendarRepository>();
 
+builder.Services.AddScoped<IUserFeedbackRepository, UserFeedbackRepository>();
+
 // Register Domain Services
 builder.Services.AddScoped<ICalendarDomainService, CalendarDomainService>();
 

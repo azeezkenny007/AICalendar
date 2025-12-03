@@ -1,5 +1,6 @@
 using AICalendar.Domain.Aggregates.CalendarAggregate;
 using AICalendar.Domain.Aggregates.PredictionAggregate;
+using AICalendar.Domain.Aggregates.UserFeedbackAggregate;
 using AICalendar.Domain.Entities;
 using AICalendar.Domain.Interfaces;
 using AICalendar.Domain.ValueObjects;
@@ -22,6 +23,8 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<Prediction> Predictions => Set<Prediction>();
     public DbSet<Calendar> Calendars => Set<Calendar>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+    public DbSet<UserFeedback> UserFeedbacks => Set<UserFeedback>();
+
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -42,6 +45,8 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
         modelBuilder.ApplyConfiguration(new PredictionConfiguration());
         modelBuilder.ApplyConfiguration(new CalendarConfiguration());
         modelBuilder.ApplyConfiguration(new OutboxConfiguration());
+        modelBuilder.ApplyConfiguration(new UserFeedbackConfiguration());
+
 
         // Seed data
         UserTransactionSeedData.SeedUserAndTransactionData(modelBuilder);

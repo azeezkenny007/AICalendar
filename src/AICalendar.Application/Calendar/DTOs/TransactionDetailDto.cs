@@ -11,6 +11,8 @@ public class TransactionDetailDto
     public DateTime CreatedAt { get; set; }
     public bool IsKept { get; set; }
     public bool IsDiscarded { get; set; }
+    public string? ReceiverId { get; set; }
+    public string? MerchantId { get; set; }
 
     // Calendar-specific fields
     public string PredictionStatus { get; set; } = "Pending"; // Pending, Kept, Discarded, Edited

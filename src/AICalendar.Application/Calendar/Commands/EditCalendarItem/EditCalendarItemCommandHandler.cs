@@ -44,6 +44,17 @@ public class EditCalendarItemCommandHandler : IRequestHandler<EditCalendarItemCo
             );
         }
 
+        // Get the existing item to use current values as fallbacks
+        var existingItem = calendar.Items.First(i => i.Id == request.ItemId);
+
+        // Use provided values or fall back to existing values
+        var merchant = request.Merchant ?? existingItem.Merchant;
+        var amount = request.Amount ?? existingItem.Amount;
+        var dueDate = request.DueDate ?? existingItem.DueDate;
+        var account = request.Account ?? existingItem.Account;
+        var accountName = request.AccountName ?? existingItem.AccountName;
+        var description = request.Description ?? existingItem.Description;
+
         // Validate if the item can be updated using domain service
         var canUpdateResult = _calendarDomainService.CanUpdateItem(calendar, request.ItemId);
         if (!canUpdateResult.IsSuccess)
@@ -55,32 +66,35 @@ public class EditCalendarItemCommandHandler : IRequestHandler<EditCalendarItemCo
             );
         }
 
-        // Check for duplicates (excluding the current item)
-        var duplicateResult = _calendarDomainService.IsDuplicateItem(
-            calendar,
-            request.Merchant,
-            request.DueDate,
-            request.ItemId
-        );
-
-        if (!duplicateResult.IsSuccess)
+        // Check for duplicates (excluding the current item) - only if merchant or dueDate changed
+        if (request.Merchant != null || request.DueDate.HasValue)
         {
-            return OperationResult.Conflict(
-                "Duplicate calendar item",
-                duplicateResult.Error!,
-                "A calendar item with the same merchant and due date already exists in your calendar."
+            var duplicateResult = _calendarDomainService.IsDuplicateItem(
+                calendar,
+                merchant,
+                dueDate,
+                request.ItemId
             );
+
+            if (!duplicateResult.IsSuccess)
+            {
+                return OperationResult.Conflict(
+                    "Duplicate calendar item",
+                    duplicateResult.Error!,
+                    "A calendar item with the same merchant and due date already exists in your calendar."
+                );
+            }
         }
 
         // Update the calendar item
         var updateResult = calendar.UpdateItem(
             request.ItemId,
-            request.Merchant,
-            request.Amount,
-            request.DueDate,
-            request.Account,
-            request.AccountName,
-            request.Description
+            merchant,
+            amount,
+            dueDate,
+            account,
+            accountName,
+            description
         );
 
         if (!updateResult.IsSuccess)
@@ -121,20 +135,23 @@ public class EditCalendarItemCommandHandler : IRequestHandler<EditCalendarItemCo
         _logger.LogInformation(
             "Calendar item {ItemId} updated: {Merchant} - ${Amount} due on {DueDate}",
             request.ItemId.Value,
-            request.Merchant,
-            request.Amount,
-            request.DueDate
+            merchant,
+            amount,
+            dueDate
         );
 
         return OperationResult.Success(
             "Calendar item updated successfully",
-            $"{request.Merchant} updated - ${request.Amount:F2} due on {request.DueDate:MMM dd, yyyy}",
+            $"{merchant} updated - ${amount:F2} due on {dueDate:MMM dd, yyyy}",
             new
             {
                 itemId = request.ItemId.Value,
-                merchant = request.Merchant,
-                amount = request.Amount,
-                dueDate = request.DueDate
+                merchant = merchant,
+                amount = amount,
+                dueDate = dueDate,
+                account = account,
+                accountName = accountName,
+                description = description
             }
         );
     }

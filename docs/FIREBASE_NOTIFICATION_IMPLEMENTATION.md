@@ -45,7 +45,7 @@ User's device receives push notification
 ### Technologies Used
 
 - **Backend**: .NET 8 + Firebase Admin SDK
-- **Frontend**: Flutter/React + Firebase SDK
+- **Frontend**: KOTLIN/SWIFT + Firebase SDK
 - **Database**: SQL Server (add FCM token column)
 - **Job Scheduler**: Hangfire (already configured)
 

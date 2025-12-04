@@ -1942,7 +1942,7 @@ struct LoginView: View {
 
 ### Step 5.1: Create API Controller
 
-**File**: `src/AICalendar.API/Controllers/UsersController.cs`
+**File**: `src/AICalendar.API/Controllers/UserNotificationsController.cs`
 
 ```csharp
 using AICalendar.Application.Common.Interfaces;
@@ -1953,20 +1953,20 @@ using Microsoft.AspNetCore.Mvc;
 namespace AICalendar.API.Controllers;
 
 [ApiController]
-[Route("api/users")]
+[Route("api/user-notifications")]
 [Produces("application/json")]
-public class UsersController : ControllerBase
+public class UserNotificationsController : ControllerBase
 {
     private readonly IUserRepository _userRepository;
     private readonly INotificationService _notificationService;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly ILogger<UsersController> _logger;
+    private readonly ILogger<UserNotificationsController> _logger;
 
-    public UsersController(
+    public UserNotificationsController(
         IUserRepository userRepository,
         INotificationService notificationService,
         IUnitOfWork unitOfWork,
-        ILogger<UsersController> logger)
+        ILogger<UserNotificationsController> logger)
     {
         _userRepository = userRepository;
         _notificationService = notificationService;

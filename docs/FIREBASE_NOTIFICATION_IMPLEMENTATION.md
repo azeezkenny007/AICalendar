@@ -1420,7 +1420,7 @@ class NotificationPermissionHelper {
 
 ### Step 5.1: Create API Endpoint for Device Registration
 
-**File**: `src/AICalendar.API/Controllers/UsersController.cs`
+**File**: `src/AICalendar.API/Controllers/UserNotificationsController.cs`
 
 ```csharp
 using AICalendar.Domain.Interfaces;
@@ -1430,17 +1430,17 @@ using Microsoft.AspNetCore.Mvc;
 namespace AICalendar.API.Controllers;
 
 [ApiController]
-[Route("api/users")]
-public class UsersController : ControllerBase
+[Route("api/user-notifications")]
+public class UserNotificationsController : ControllerBase
 {
     private readonly IUserRepository _userRepository;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly ILogger<UsersController> _logger;
+    private readonly ILogger<UserNotificationsController> _logger;
 
-    public UsersController(
+    public UserNotificationsController(
         IUserRepository userRepository,
         IUnitOfWork unitOfWork,
-        ILogger<UsersController> logger)
+        ILogger<UserNotificationsController> logger)
     {
         _userRepository = userRepository;
         _unitOfWork = unitOfWork;

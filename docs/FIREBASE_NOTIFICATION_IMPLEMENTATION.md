@@ -50,6 +50,65 @@ User's device receives push notification
 - **Database**: SQL Server (add FCM token column)
 - **Job Scheduler**: Hangfire (already configured)
 
+### Notification Schedule
+
+The system sends payment reminders at strategic intervals before and after the payment due date:
+
+**Before Payment Due:**
+- 24 hours before
+- 6 hours before
+- 1 hour before
+
+**After Payment Due (Overdue):**
+- 12 hours after
+- 24 hours after
+- 48 hours after
+
+**Total: 6 notifications per unpaid item**
+
+#### Example Timeline
+
+For a payment due on **January 15, 2025 at 2:00 PM**:
+
+```
+Before Due:
+├─ Jan 14, 2:00 PM  → "Payment due in 24 hours: $100.00"
+├─ Jan 15, 8:00 AM  → "Payment due in 6 hours: $100.00"
+└─ Jan 15, 1:00 PM  → "Payment due in 1 hour: $100.00"
+
+Due Time:
+    Jan 15, 2:00 PM  → PAYMENT DUE
+
+After Due (Overdue):
+├─ Jan 16, 2:00 AM  → "Payment overdue by 12 hours: $100.00"
+├─ Jan 16, 2:00 PM  → "Payment overdue by 24 hours: $100.00"
+└─ Jan 17, 2:00 PM  → "Payment overdue by 48 hours: $100.00"
+```
+
+**Why This Schedule?**
+
+This is a streamlined approach that:
+- Provides early warning (24 hours), mid-day reminder (6 hours), and final alert (1 hour)
+- Balances user awareness without overwhelming them with notifications
+- Gives users time to make payment without feeling harassed
+- Escalates gradually for overdue payments (12h, 24h, 48h)
+
+**Technical Implementation:**
+
+The `SendRemindersJob` runs hourly via Hangfire and checks for calendar items that fall within these time windows. The job queries unpaid items where:
+
+```csharp
+// Before due notifications
+DateTime.UtcNow >= item.PaymentDue.AddHours(-24) && DateTime.UtcNow < item.PaymentDue.AddHours(-23)
+DateTime.UtcNow >= item.PaymentDue.AddHours(-6) && DateTime.UtcNow < item.PaymentDue.AddHours(-5)
+DateTime.UtcNow >= item.PaymentDue.AddHours(-1) && DateTime.UtcNow < item.PaymentDue
+
+// After due notifications
+DateTime.UtcNow >= item.PaymentDue.AddHours(12) && DateTime.UtcNow < item.PaymentDue.AddHours(13)
+DateTime.UtcNow >= item.PaymentDue.AddHours(24) && DateTime.UtcNow < item.PaymentDue.AddHours(25)
+DateTime.UtcNow >= item.PaymentDue.AddHours(48) && DateTime.UtcNow < item.PaymentDue.AddHours(49)
+```
+
 ---
 
 ## Prerequisites
@@ -381,7 +440,163 @@ else
 }
 ```
 
-### Step 2.5: Create Null Notification Service (For Development)
+### Step 2.5: Implement SendRemindersJob
+
+**File**: `src/AICalendar.Application/BackgroundJobs/SendRemindersJob.cs`
+
+The job is already registered with Hangfire but needs implementation. Here's what it should do:
+
+```csharp
+using AICalendar.Application.Common.Interfaces;
+using AICalendar.Domain.Interfaces;
+using Microsoft.Extensions.Logging;
+
+namespace AICalendar.Application.BackgroundJobs;
+
+/// <summary>
+/// Hangfire job that sends reminders for upcoming calendar items
+/// Runs every hour
+/// </summary>
+public class SendRemindersJob
+{
+    private readonly ILogger<SendRemindersJob> _logger;
+    private readonly ICalendarRepository _calendarRepository;
+    private readonly INotificationService _notificationService;
+
+    public SendRemindersJob(
+        ILogger<SendRemindersJob> logger,
+        ICalendarRepository calendarRepository,
+        INotificationService notificationService)
+    {
+        _logger = logger;
+        _calendarRepository = calendarRepository;
+        _notificationService = notificationService;
+    }
+
+    public async Task SendDueReminders()
+    {
+        _logger.LogInformation("Starting reminder processing at {Time}", DateTime.UtcNow);
+
+        try
+        {
+            // Get all unpaid calendar items with payment due dates
+            var unpaidItems = await _calendarRepository.GetUnpaidItemsWithDueDatesAsync();
+
+            if (!unpaidItems.Any())
+            {
+                _logger.LogInformation("No unpaid items found. Skipping reminder processing.");
+                return;
+            }
+
+            _logger.LogInformation("Found {Count} unpaid items to check", unpaidItems.Count);
+
+            var notificationsSent = 0;
+            var now = DateTime.UtcNow;
+
+            foreach (var item in unpaidItems)
+            {
+                var paymentDue = item.PaymentDue!.Value; // Already filtered to non-null
+
+                // Check each time window and send notification if matched
+                string? notificationMessage = null;
+
+                // BEFORE DUE NOTIFICATIONS
+                if (now >= paymentDue.AddHours(-24) && now < paymentDue.AddHours(-23))
+                {
+                    notificationMessage = $"Payment Due Soon: {item.Title} - ${item.Amount:F2} due in 24 hours ({paymentDue:MMM dd, h:mm tt})";
+                }
+                else if (now >= paymentDue.AddHours(-6) && now < paymentDue.AddHours(-5))
+                {
+                    notificationMessage = $"Payment Due Soon: {item.Title} - ${item.Amount:F2} due in 6 hours ({paymentDue:h:mm tt})";
+                }
+                else if (now >= paymentDue.AddHours(-1) && now < paymentDue)
+                {
+                    notificationMessage = $"Payment Due Soon: {item.Title} - ${item.Amount:F2} due in 1 hour ({paymentDue:h:mm tt})";
+                }
+                // AFTER DUE NOTIFICATIONS (OVERDUE)
+                else if (now >= paymentDue.AddHours(12) && now < paymentDue.AddHours(13))
+                {
+                    notificationMessage = $"Payment Overdue: {item.Title} - ${item.Amount:F2} was due 12 hours ago";
+                }
+                else if (now >= paymentDue.AddHours(24) && now < paymentDue.AddHours(25))
+                {
+                    notificationMessage = $"Payment Overdue: {item.Title} - ${item.Amount:F2} was due 24 hours ago";
+                }
+                else if (now >= paymentDue.AddHours(48) && now < paymentDue.AddHours(49))
+                {
+                    notificationMessage = $"Payment Overdue: {item.Title} - ${item.Amount:F2} was due 48 hours ago";
+                }
+
+                // Send notification if a time window matched
+                if (!string.IsNullOrEmpty(notificationMessage))
+                {
+                    await _notificationService.SendPushNotificationAsync(
+                        userId: item.UserId,
+                        title: "AICalendar Reminder",
+                        message: notificationMessage,
+                        data: new Dictionary<string, string>
+                        {
+                            { "calendarItemId", item.Id.Value.ToString() },
+                            { "type", "payment_reminder" }
+                        }
+                    );
+
+                    notificationsSent++;
+
+                    _logger.LogInformation(
+                        "Sent reminder for item {ItemId} to user {UserId}: {Message}",
+                        item.Id.Value,
+                        item.UserId.Value,
+                        notificationMessage
+                    );
+                }
+            }
+
+            _logger.LogInformation(
+                "Reminder processing completed. Sent {SentCount} notifications out of {TotalCount} unpaid items",
+                notificationsSent,
+                unpaidItems.Count
+            );
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during reminder processing");
+            throw;
+        }
+    }
+}
+```
+
+**Key Implementation Details:**
+
+1. **Queries unpaid items**: Uses `GetUnpaidItemsWithDueDatesAsync()` to get all calendar items where `IsPaid = false` and `PaymentDue IS NOT NULL`
+
+2. **Checks 6 time windows**: For each item, checks if current time falls within any of the notification windows:
+   - 24 hours before (window: -24h to -23h)
+   - 6 hours before (window: -6h to -5h)
+   - 1 hour before (window: -1h to due time)
+   - 12 hours after (window: +12h to +13h)
+   - 24 hours after (window: +24h to +25h)
+   - 48 hours after (window: +48h to +49h)
+
+3. **Sends targeted notifications**: Creates appropriate message based on which window matched
+
+4. **Includes metadata**: Passes calendar item ID in notification data for deep linking
+
+5. **Logs everything**: Tracks how many notifications sent vs total unpaid items
+
+**Why 1-hour windows?**
+- Job runs every hour
+- Each window is 1 hour wide
+- Guarantees we won't miss notifications
+- Prevents duplicate notifications (same item won't match same window twice)
+
+**What happens if item is paid?**
+- Next job run won't include it in the query
+- No notification sent
+- Immediately stops reminder cycle
+
+### Step 2.6: Create Null Notification Service (For Development)
 
 **File**: `src/AICalendar.Infrastructure/Services/NullNotificationService.cs`
 

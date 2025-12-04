@@ -40,6 +40,16 @@ public class RegisterDeviceCommandHandler : IRequestHandler<RegisterDeviceComman
                 );
             }
 
+            // Business rule: a user that is already registered cannot register again
+            if (!string.IsNullOrEmpty(user.FcmDeviceToken))
+            {
+                return OperationResult.Conflict(
+                    "Device already registered",
+                    "User already has a registered device token",
+                    "The user already has an active FCM device token. Unregister the existing device before registering a new one."
+                );
+            }
+
             user.UpdateDeviceToken(request.FcmToken);
             await _userRepository.UpdateAsync(user);
             await _unitOfWork.SaveChangesAsync(cancellationToken);

@@ -38,6 +38,16 @@ public class UnregisterDeviceCommandHandler : IRequestHandler<UnregisterDeviceCo
                 );
             }
 
+            // Business rule: a user that is not registered cannot be unregistered again
+            if (string.IsNullOrEmpty(user.FcmDeviceToken))
+            {
+                return OperationResult.BadRequest(
+                    "No device registered",
+                    "User has no registered device token to unregister",
+                    "The user does not currently have an FCM device token registered."
+                );
+            }
+
             user.ClearDeviceToken();
             await _userRepository.UpdateAsync(user);
             await _unitOfWork.SaveChangesAsync(cancellationToken);

@@ -10,25 +10,26 @@ namespace AICalendar.API.Controllers;
 /// Manages user device registration and push notification settings
 /// </summary>
 [ApiController]
-[Route("api/users")]
+[Route("api/user-notifications")]
 [Produces("application/json")]
-public class UsersController : ControllerBase
+public class UserNotificationsController : ControllerBase
 {
     private readonly IMediator _mediator;
 
-    public UsersController(IMediator mediator)
+    public UserNotificationsController(IMediator mediator)
     {
         _mediator = mediator;
     }
 
     /// <summary>
-    /// Registers or updates a user's FCM device token for push notifications
+    /// Registers a user's FCM device token for push notifications
     /// </summary>
     /// <param name="request">The device registration request containing user ID and FCM token</param>
     /// <returns>Success status of the device registration</returns>
     /// <response code="200">Device token successfully registered for the user</response>
     /// <response code="400">Invalid request data or malformed FCM token</response>
     /// <response code="404">User with the specified ID was not found</response>
+    /// <response code="409">User already has a registered device token</response>
     /// <response code="500">An unexpected error occurred during registration</response>
     /// <remarks>
     /// Sample request:
@@ -40,13 +41,14 @@ public class UsersController : ControllerBase
     ///     }
     ///
     /// The FCM token should be obtained from Firebase SDK on the client device.
-    /// If a user already has a token registered, this will update it with the new token.
-    /// Use this endpoint when the app starts or when the FCM token is refreshed.
+    /// A user that already has a registered device must unregister it before registering a new one.
+    /// Use this endpoint when the app starts or when the FCM token is first registered.
     /// </remarks>
     [HttpPost("register-device")]
     [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status409Conflict)]
     [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> RegisterDevice(
         [FromBody] RegisterDeviceRequest request)
@@ -60,6 +62,7 @@ public class UsersController : ControllerBase
             {
                 404 => NotFound(new { message = result.Error }),
                 400 => BadRequest(new { message = result.Error }),
+                409 => Conflict(new { message = result.Error }),
                 _ => StatusCode(500, new { message = result.Error })
             };
     }
@@ -108,6 +111,7 @@ public class UsersController : ControllerBase
     /// <param name="userId">The unique identifier of the user to unregister</param>
     /// <returns>Success status of the device unregistration</returns>
     /// <response code="200">Device token successfully removed for the user</response>
+    /// <response code="400">User does not have a registered device token</response>
     /// <response code="404">User with the specified ID was not found</response>
     /// <response code="500">An error occurred while unregistering the device</response>
     /// <remarks>
@@ -117,10 +121,12 @@ public class UsersController : ControllerBase
     ///
     /// Call this endpoint when a user logs out or when they want to stop receiving push notifications.
     /// After unregistering, the user will not receive any push notifications until they register a new device token.
+    /// A user that is not registered cannot be unregistered again.
     /// This helps maintain user privacy and reduces unnecessary notification attempts.
     /// </remarks>
     [HttpPost("unregister-device/{userId:guid}")]
     [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> UnregisterDevice(Guid userId)
@@ -133,6 +139,7 @@ public class UsersController : ControllerBase
             : result.StatusCode switch
             {
                 404 => NotFound(new { message = result.Error }),
+                400 => BadRequest(new { message = result.Error }),
                 _ => StatusCode(500, new { message = result.Error })
             };
     }

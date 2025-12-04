@@ -5,16 +5,16 @@ This guide covers all user-related endpoints in the AICalendar API for managing 
 ## Base URL
 
 ```
-/api/users
+/api/user-notifications
 ```
 
 ## Endpoints Overview
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/users/register-device` | Register or update FCM device token |
-| POST | `/api/users/test-notification/{userId}` | Send test push notification |
-| POST | `/api/users/unregister-device/{userId}` | Remove FCM device token |
+| POST | `/api/user-notifications/register-device` | Register or update FCM device token |
+| POST | `/api/user-notifications/test-notification/{userId}` | Send test push notification |
+| POST | `/api/user-notifications/unregister-device/{userId}` | Remove FCM device token |
 
 ---
 
@@ -24,7 +24,7 @@ Registers or updates a user's Firebase Cloud Messaging (FCM) device token for pu
 
 ### Endpoint
 ```
-POST /api/users/register-device
+POST /api/user-notifications/register-device
 ```
 
 ### Request Body
@@ -73,7 +73,7 @@ POST /api/users/register-device
 
 ### Example Request (cURL)
 ```bash
-curl -X POST "https://your-api-url.com/api/users/register-device" \
+curl -X POST "https://your-api-url.com/api/user-notifications/register-device" \
   -H "Content-Type: application/json" \
   -d '{
     "userId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
@@ -89,7 +89,7 @@ Sends a test push notification to a user's registered device to verify Firebase 
 
 ### Endpoint
 ```
-POST /api/users/test-notification/{userId}
+POST /api/user-notifications/test-notification/{userId}
 ```
 
 ### URL Parameters
@@ -137,7 +137,7 @@ The test notification will contain:
 
 ### Example Request (cURL)
 ```bash
-curl -X POST "https://your-api-url.com/api/users/test-notification/3fa85f64-5717-4562-b3fc-2c963f66afa6" \
+curl -X POST "https://your-api-url.com/api/user-notifications/test-notification/3fa85f64-5717-4562-b3fc-2c963f66afa6" \
   -H "Content-Type: application/json"
 ```
 
@@ -149,7 +149,7 @@ Removes a user's FCM device token to stop receiving push notifications.
 
 ### Endpoint
 ```
-POST /api/users/unregister-device/{userId}
+POST /api/user-notifications/unregister-device/{userId}
 ```
 
 ### URL Parameters
@@ -188,7 +188,7 @@ POST /api/users/unregister-device/{userId}
 
 ### Example Request (cURL)
 ```bash
-curl -X POST "https://your-api-url.com/api/users/unregister-device/3fa85f64-5717-4562-b3fc-2c963f66afa6" \
+curl -X POST "https://your-api-url.com/api/user-notifications/unregister-device/3fa85f64-5717-4562-b3fc-2c963f66afa6" \
   -H "Content-Type: application/json"
 ```
 
@@ -198,22 +198,22 @@ curl -X POST "https://your-api-url.com/api/users/unregister-device/3fa85f64-5717
 
 ### 1. First Time App Setup
 ```
-User opens app → Get FCM token from Firebase SDK → POST /api/users/register-device
+User opens app → Get FCM token from Firebase SDK → POST /api/user-notifications/register-device
 ```
 
 ### 2. Testing Notifications
 ```
-Register device → POST /api/users/test-notification/{userId} → Verify notification received
+Register device → POST /api/user-notifications/test-notification/{userId} → Verify notification received
 ```
 
 ### 3. User Logout
 ```
-User logs out → POST /api/users/unregister-device/{userId}
+User logs out → POST /api/user-notifications/unregister-device/{userId}
 ```
 
 ### 4. Token Refresh
 ```
-Firebase SDK refreshes token → POST /api/users/register-device with new token
+Firebase SDK refreshes token → POST /api/user-notifications/register-device with new token
 ```
 
 ---
@@ -221,18 +221,16 @@ Firebase SDK refreshes token → POST /api/users/register-device with new token
 ## Implementation Details
 
 ### Controller Location
-[UsersController.cs](../../src/AICalendar.API/Controllers/UsersController.cs)
+[UserNotificationsController.cs](../../src/AICalendar.API/Controllers/UserNotificationsController.cs)
 
 ### Dependencies
-- **IUserRepository**: User data access (lines 16, 22)
-- **IUnitOfWork**: Transaction management (lines 17, 23)
-- **INotificationService**: Push notification handling (lines 18, 24)
-- **ILogger**: Logging (lines 19, 25)
+- Uses MediatR pattern with command handlers
+- Commands: RegisterDeviceCommand, TestNotificationCommand, UnregisterDeviceCommand
 
 ### Key Methods
-- `RegisterDevice()`: [UsersController.cs:60-95](../../src/AICalendar.API/Controllers/UsersController.cs#L60-L95)
-- `TestNotification()`: [UsersController.cs:120-155](../../src/AICalendar.API/Controllers/UsersController.cs#L120-L155)
-- `UnregisterDevice()`: [UsersController.cs:178-201](../../src/AICalendar.API/Controllers/UsersController.cs#L178-L201)
+- `RegisterDevice()`: Handles device registration
+- `TestNotification()`: Sends test notifications
+- `UnregisterDevice()`: Removes device tokens
 
 ---
 

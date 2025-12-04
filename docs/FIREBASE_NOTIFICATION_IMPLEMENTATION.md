@@ -45,7 +45,8 @@ User's device receives push notification
 ### Technologies Used
 
 - **Backend**: .NET 8 + Firebase Admin SDK
-- **Frontend**: KOTLIN/SWIFT + Firebase SDK
+- **Android Frontend**: Kotlin + Firebase Cloud Messaging SDK
+- **iOS Frontend**: Swift + Firebase Cloud Messaging SDK
 - **Database**: SQL Server (add FCM token column)
 - **Job Scheduler**: Hangfire (already configured)
 
@@ -59,7 +60,8 @@ User's device receives push notification
 - [ ] .NET 8 SDK installed
 - [ ] Access to Firebase Console
 - [ ] SQL Server running
-- [ ] Frontend app (Flutter or React)
+- [ ] Android Studio (for Kotlin app)
+- [ ] Xcode (for Swift app)
 
 ### Estimated Time
 
@@ -83,23 +85,21 @@ User's device receives push notification
 
 ### Step 1.2: Add Your Apps to Firebase
 
-#### For Flutter Mobile App
+#### For Android (Kotlin) App
 
 1. In Firebase Console, click **"Add app"** → Select **Android** icon
-2. **Android package name**: `com.aicalendar.app` (or your package name)
-3. Download `google-services.json`
-4. Save to: `your-flutter-app/android/app/google-services.json`
+2. **Android package name**: `com.aicalendar.app` (must match your `applicationId` in `build.gradle`)
+3. **App nickname**: `AICalendar Android`
+4. Download `google-services.json`
+5. Save to: `app/google-services.json` (in your Android project root)
 
-5. Click **"Add app"** → Select **iOS** icon
-6. **iOS bundle ID**: `com.aicalendar.app` (or your bundle ID)
-7. Download `GoogleService-Info.plist`
-8. Save to: `your-flutter-app/ios/Runner/GoogleService-Info.plist`
+#### For iOS (Swift) App
 
-#### For React Web App
-
-1. Click **"Add app"** → Select **Web** icon
-2. App nickname: `AICalendar Web`
-3. Copy the Firebase config object (you'll need this later)
+1. Click **"Add app"** → Select **iOS** icon
+2. **iOS bundle ID**: `com.aicalendar.app` (must match your Xcode bundle identifier)
+3. **App nickname**: `AICalendar iOS`
+4. Download `GoogleService-Info.plist`
+5. In Xcode, drag `GoogleService-Info.plist` into your project root (make sure "Copy items if needed" is checked)
 
 ### Step 1.3: Enable Cloud Messaging
 
@@ -568,300 +568,633 @@ builder.Services.AddScoped<IUserRepository, UserRepository>();
 
 ## Phase 4: Frontend Integration
 
-### Option A: Flutter Mobile App
+### Option A: Android (Kotlin) App
 
-#### Step 4A.1: Install Flutter Package
+#### Step 4A.1: Add Firebase Dependencies
 
-```yaml
-# pubspec.yaml
-dependencies:
-  firebase_core: ^2.24.0
-  firebase_messaging: ^14.7.0
-  flutter_local_notifications: ^16.3.0
-```
-
-```bash
-flutter pub get
-```
-
-#### Step 4A.2: Configure Android
-
-**File**: `android/app/build.gradle`
-```gradle
-plugins {
-    id "com.android.application"
-    id "kotlin-android"
-    id "dev.flutter.flutter-gradle-plugin"
-    id "com.google.gms.google-services" // ADD THIS
-}
-
-dependencies {
-    // ADD THIS
-    implementation platform('com.google.firebase:firebase-bom:32.7.0')
-    implementation 'com.google.firebase:firebase-messaging'
-}
-```
-
-**File**: `android/build.gradle`
+**File**: `build.gradle` (Project level)
 ```gradle
 buildscript {
     dependencies {
-        // ADD THIS
         classpath 'com.google.gms:google-services:4.4.0'
     }
 }
 ```
 
-**File**: `android/app/src/main/AndroidManifest.xml`
+**File**: `build.gradle` (App level)
+```gradle
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+    id 'com.google.gms.google-services' // ADD THIS
+}
+
+dependencies {
+    // Firebase BOM
+    implementation platform('com.google.firebase:firebase-bom:32.7.0')
+
+    // Firebase Cloud Messaging
+    implementation 'com.google.firebase:firebase-messaging-ktx'
+
+    // Coroutines for async operations
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
+
+    // Retrofit for API calls (if not already added)
+    implementation 'com.squareup.retrofit2:retrofit:2.9.0'
+    implementation 'com.squareup.retrofit2:converter-gson:2.9.0'
+}
+```
+
+#### Step 4A.2: Update AndroidManifest.xml
+
+**File**: `app/src/main/AndroidManifest.xml`
 ```xml
-<manifest>
-    <application>
-        <!-- ADD THIS -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" /> <!-- Android 13+ -->
+
+    <application
+        android:name=".AICalendarApplication"
+        ...>
+
+        <!-- Default notification channel -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="payment_reminders" />
+
+        <!-- Firebase Messaging Service -->
+        <service
+            android:name=".notifications.FCMService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
     </application>
 </manifest>
 ```
 
-#### Step 4A.3: Configure iOS
+#### Step 4A.3: Create Firebase Messaging Service
 
-**File**: `ios/Runner/AppDelegate.swift`
-```swift
-import UIKit
-import Flutter
-import Firebase // ADD THIS
+**File**: `app/src/main/java/com/aicalendar/app/notifications/FCMService.kt`
+```kotlin
+package com.aicalendar.app.notifications
 
-@UIApplicationMain
-@objc class AppDelegate: FlutterAppDelegate {
-  override func application(
-    _ application: UIApplication,
-    didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
-  ) -> Bool {
-    FirebaseApp.configure() // ADD THIS
-    GeneratedPluginRegistrant.register(with: self)
-    return super.application(application, didFinishLaunchingWithOptions: launchOptions)
-  }
-}
-```
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
+import android.os.Build
+import android.util.Log
+import androidx.core.app.NotificationCompat
+import com.aicalendar.app.MainActivity
+import com.aicalendar.app.R
+import com.google.firebase.messaging.FirebaseMessagingService
+import com.google.firebase.messaging.RemoteMessage
 
-#### Step 4A.4: Initialize Firebase in Flutter
+class FCMService : FirebaseMessagingService() {
 
-**File**: `lib/main.dart`
-```dart
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
-import 'firebase_options.dart';
-
-// Background message handler
-Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp();
-  print("Background message: ${message.notification?.title}");
-}
-
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  // Initialize Firebase
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-
-  // Register background handler
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-
-  runApp(MyApp());
-}
-```
-
-#### Step 4A.5: Request Permissions and Get Token
-
-**File**: `lib/services/notification_service.dart`
-```dart
-import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-
-class NotificationService {
-  final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
-
-  Future<void> initialize(String userId) async {
-    // Request permission
-    NotificationSettings settings = await _firebaseMessaging.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
-
-    if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-      print('User granted permission');
-
-      // Get FCM token
-      String? token = await _firebaseMessaging.getToken();
-      print('FCM Token: $token');
-
-      // Send token to backend
-      if (token != null) {
-        await _registerDeviceToken(userId, token);
-      }
-
-      // Listen for token refresh
-      _firebaseMessaging.onTokenRefresh.listen((newToken) {
-        _registerDeviceToken(userId, newToken);
-      });
-
-      // Handle foreground messages
-      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-        print('Foreground message: ${message.notification?.title}');
-        _showLocalNotification(message);
-      });
-
-      // Handle notification tap
-      FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-        print('Notification tapped: ${message.data}');
-        _handleNotificationTap(message);
-      });
+    companion object {
+        private const val TAG = "FCMService"
+        private const val CHANNEL_ID = "payment_reminders"
+        private const val CHANNEL_NAME = "Payment Reminders"
     }
-  }
 
-  Future<void> _registerDeviceToken(String userId, String fcmToken) async {
-    try {
-      final response = await http.post(
-        Uri.parse('https://your-api.com/api/users/register-device'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'userId': userId,
-          'fcmToken': fcmToken,
-        }),
-      );
+    override fun onNewToken(token: String) {
+        super.onNewToken(token)
+        Log.d(TAG, "New FCM token: $token")
 
-      if (response.statusCode == 200) {
-        print('Device token registered successfully');
-      }
-    } catch (e) {
-      print('Error registering device token: $e');
+        // Send token to your backend
+        sendTokenToServer(token)
     }
-  }
 
-  void _showLocalNotification(RemoteMessage message) {
-    // Implement local notification display
-  }
+    override fun onMessageReceived(message: RemoteMessage) {
+        super.onMessageReceived(message)
 
-  void _handleNotificationTap(RemoteMessage message) {
-    // Navigate to relevant screen based on message data
-  }
+        Log.d(TAG, "Message received from: ${message.from}")
+
+        // Check if message contains notification payload
+        message.notification?.let { notification ->
+            showNotification(
+                title = notification.title ?: "AICalendar",
+                body = notification.body ?: "",
+                data = message.data
+            )
+        }
+
+        // Check if message contains data payload
+        if (message.data.isNotEmpty()) {
+            Log.d(TAG, "Message data: ${message.data}")
+            handleDataPayload(message.data)
+        }
+    }
+
+    private fun showNotification(title: String, body: String, data: Map<String, String>) {
+        createNotificationChannel()
+
+        val intent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            // Add data to intent
+            data.forEach { (key, value) ->
+                putExtra(key, value)
+            }
+        }
+
+        val pendingIntent = PendingIntent.getActivity(
+            this,
+            0,
+            intent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
+        val notificationBuilder = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification) // Add your icon
+            .setContentTitle(title)
+            .setContentText(body)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.notify(System.currentTimeMillis().toInt(), notificationBuilder.build())
+    }
+
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                CHANNEL_NAME,
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Channel for payment reminder notifications"
+            }
+
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(channel)
+        }
+    }
+
+    private fun sendTokenToServer(token: String) {
+        // Get userId from SharedPreferences or your auth manager
+        val userId = getUserId() ?: return
+
+        // Use your API service to send token
+        NotificationRepository.registerDeviceToken(userId, token)
+    }
+
+    private fun handleDataPayload(data: Map<String, String>) {
+        // Handle custom data payload
+        val userId = data["userId"]
+        val timestamp = data["timestamp"]
+
+        Log.d(TAG, "Data - userId: $userId, timestamp: $timestamp")
+    }
+
+    private fun getUserId(): String? {
+        val sharedPrefs = getSharedPreferences("AICalendar", Context.MODE_PRIVATE)
+        return sharedPrefs.getString("user_id", null)
+    }
 }
 ```
 
-### Option B: React Web App
+#### Step 4A.4: Create Notification Manager
 
-#### Step 4B.1: Install Dependencies
+**File**: `app/src/main/java/com/aicalendar/app/notifications/NotificationManager.kt`
+```kotlin
+package com.aicalendar.app.notifications
+
+import android.Manifest
+import android.app.Activity
+import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
+import android.util.Log
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import com.google.android.gms.tasks.OnCompleteListener
+import com.google.firebase.messaging.FirebaseMessaging
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+
+class NotificationManager(private val context: Context) {
+
+    companion object {
+        private const val TAG = "NotificationManager"
+        const val NOTIFICATION_PERMISSION_REQUEST_CODE = 1001
+    }
+
+    fun initialize(userId: String) {
+        // Request notification permission for Android 13+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            requestNotificationPermission()
+        }
+
+        // Get FCM token
+        getFCMToken(userId)
+    }
+
+    fun requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                ActivityCompat.requestPermissions(
+                    context as Activity,
+                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                    NOTIFICATION_PERMISSION_REQUEST_CODE
+                )
+            }
+        }
+    }
+
+    private fun getFCMToken(userId: String) {
+        FirebaseMessaging.getInstance().token.addOnCompleteListener(OnCompleteListener { task ->
+            if (!task.isSuccessful) {
+                Log.w(TAG, "Fetching FCM token failed", task.exception)
+                return@OnCompleteListener
+            }
+
+            // Get FCM token
+            val token = task.result
+            Log.d(TAG, "FCM Token: $token")
+
+            // Send token to backend
+            registerDeviceToken(userId, token)
+        })
+    }
+
+    private fun registerDeviceToken(userId: String, fcmToken: String) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                NotificationRepository.registerDeviceToken(userId, fcmToken)
+                Log.d(TAG, "Device token registered successfully")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error registering device token", e)
+            }
+        }
+    }
+}
+```
+
+#### Step 4A.5: Create API Repository
+
+**File**: `app/src/main/java/com/aicalendar/app/notifications/NotificationRepository.kt`
+```kotlin
+package com.aicalendar.app.notifications
+
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
+import retrofit2.http.Body
+import retrofit2.http.POST
+
+data class RegisterDeviceRequest(
+    val userId: String,
+    val fcmToken: String
+)
+
+interface NotificationApiService {
+    @POST("api/users/register-device")
+    suspend fun registerDevice(@Body request: RegisterDeviceRequest)
+}
+
+object NotificationRepository {
+
+    private const val BASE_URL = "https://your-api-url.com/"
+
+    private val retrofit = Retrofit.Builder()
+        .baseUrl(BASE_URL)
+        .addConverterFactory(GsonConverterFactory.create())
+        .build()
+
+    private val apiService = retrofit.create(NotificationApiService::class.java)
+
+    suspend fun registerDeviceToken(userId: String, fcmToken: String) {
+        apiService.registerDevice(RegisterDeviceRequest(userId, fcmToken))
+    }
+}
+```
+
+#### Step 4A.6: Initialize in Application Class
+
+**File**: `app/src/main/java/com/aicalendar/app/AICalendarApplication.kt`
+```kotlin
+package com.aicalendar.app
+
+import android.app.Application
+import com.google.firebase.FirebaseApp
+
+class AICalendarApplication : Application() {
+
+    override fun onCreate() {
+        super.onCreate()
+
+        // Initialize Firebase
+        FirebaseApp.initializeApp(this)
+    }
+}
+```
+
+#### Step 4A.7: Initialize After Login
+
+**File**: `app/src/main/java/com/aicalendar/app/LoginActivity.kt` (or wherever you handle login)
+```kotlin
+// After successful login
+val userId = loginResponse.userId
+val notificationManager = NotificationManager(this)
+notificationManager.initialize(userId)
+
+// Save userId to SharedPreferences
+getSharedPreferences("AICalendar", Context.MODE_PRIVATE)
+    .edit()
+    .putString("user_id", userId)
+    .apply()
+```
+
+---
+
+### Option B: iOS (Swift) App
+
+#### Step 4B.1: Install Firebase SDK
+
+**File**: Add to your Podfile
+
+```ruby
+platform :ios, '13.0'
+use_frameworks!
+
+target 'AICalendar' do
+  # Firebase pods
+  pod 'Firebase/Core'
+  pod 'Firebase/Messaging'
+end
+```
+
+Then run:
 
 ```bash
-npm install firebase
+pod install
 ```
 
-#### Step 4B.2: Create Firebase Config
+**OR** using Swift Package Manager in Xcode:
 
-**File**: `src/firebase-config.js`
-```javascript
-import { initializeApp } from "firebase/app";
-import { getMessaging, getToken, onMessage } from "firebase/messaging";
+1. File → Add Packages
+2. Enter: `https://github.com/firebase/firebase-ios-sdk`
+3. Select: FirebaseMessaging
 
-const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "aicalendar.firebaseapp.com",
-  projectId: "aicalendar",
-  storageBucket: "aicalendar.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
-};
+#### Step 4B.2: Enable Push Notifications in Xcode
 
-const app = initializeApp(firebaseConfig);
-const messaging = getMessaging(app);
+1. Open your project in Xcode
+2. Select your project target
+3. Go to **Signing & Capabilities**
+4. Click **+ Capability**
+5. Add **Push Notifications**
+6. Add **Background Modes** → Check **Remote notifications**
 
-export { messaging, getToken, onMessage };
-```
+#### Step 4B.3: Configure AppDelegate
 
-#### Step 4B.3: Create Service Worker
+**File**: `AppDelegate.swift`
+```swift
+import UIKit
+import Firebase
+import FirebaseMessaging
+import UserNotifications
 
-**File**: `public/firebase-messaging-sw.js`
-```javascript
-importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js');
+@main
+class AppDelegate: UIResponder, UIApplicationDelegate, UNUserNotificationCenterDelegate, MessagingDelegate {
 
-firebase.initializeApp({
-  apiKey: "YOUR_API_KEY",
-  authDomain: "aicalendar.firebaseapp.com",
-  projectId: "aicalendar",
-  storageBucket: "aicalendar.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
-});
+    func application(_ application: UIApplication,
+                     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
 
-const messaging = firebase.messaging();
+        // Configure Firebase
+        FirebaseApp.configure()
 
-messaging.onBackgroundMessage((payload) => {
-  console.log('Background message:', payload);
+        // Set messaging delegate
+        Messaging.messaging().delegate = self
 
-  const notificationTitle = payload.notification.title;
-  const notificationOptions = {
-    body: payload.notification.body,
-    icon: '/icon-192x192.png'
-  };
+        // Set notification delegate
+        UNUserNotificationCenter.current().delegate = self
 
-  self.registration.showNotification(notificationTitle, notificationOptions);
-});
-```
+        // Request notification permissions
+        requestNotificationPermissions()
 
-#### Step 4B.4: Request Permission and Get Token
+        // Register for remote notifications
+        application.registerForRemoteNotifications()
 
-**File**: `src/services/notificationService.js`
-```javascript
-import { messaging, getToken, onMessage } from '../firebase-config';
-
-export const initializeNotifications = async (userId) => {
-  try {
-    // Request permission
-    const permission = await Notification.requestPermission();
-
-    if (permission === 'granted') {
-      // Get FCM token
-      const token = await getToken(messaging, {
-        vapidKey: 'YOUR_VAPID_KEY' // Get from Firebase Console
-      });
-
-      console.log('FCM Token:', token);
-
-      // Send to backend
-      await registerDeviceToken(userId, token);
-
-      // Listen for foreground messages
-      onMessage(messaging, (payload) => {
-        console.log('Foreground message:', payload);
-        showNotification(payload);
-      });
+        return true
     }
-  } catch (error) {
-    console.error('Error initializing notifications:', error);
-  }
-};
 
-const registerDeviceToken = async (userId, fcmToken) => {
-  await fetch('/api/users/register-device', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId, fcmToken })
-  });
-};
+    func requestNotificationPermissions() {
+        let authOptions: UNAuthorizationOptions = [.alert, .badge, .sound]
+        UNUserNotificationCenter.current().requestAuthorization(options: authOptions) { granted, error in
+            if let error = error {
+                print("Error requesting notification permissions: \(error)")
+                return
+            }
 
-const showNotification = (payload) => {
-  new Notification(payload.notification.title, {
-    body: payload.notification.body,
-    icon: '/icon-192x192.png'
-  });
-};
+            if granted {
+                print("Notification permission granted")
+            } else {
+                print("Notification permission denied")
+            }
+        }
+    }
+
+    // MARK: - FCM Token Management
+
+    func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
+        print("FCM Token: \(fcmToken ?? "")")
+
+        // Send token to backend
+        if let token = fcmToken {
+            registerDeviceToken(token)
+        }
+    }
+
+    func application(_ application: UIApplication,
+                     didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        // Pass device token to Firebase
+        Messaging.messaging().apnsToken = deviceToken
+    }
+
+    func application(_ application: UIApplication,
+                     didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        print("Failed to register for remote notifications: \(error)")
+    }
+
+    // MARK: - Handle Notifications
+
+    // Handle notification when app is in foreground
+    func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                willPresent notification: UNNotification,
+                                withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+        let userInfo = notification.request.content.userInfo
+        print("Foreground notification: \(userInfo)")
+
+        // Show notification even when app is in foreground
+        completionHandler([[.banner, .badge, .sound]])
+    }
+
+    // Handle notification tap
+    func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                didReceive response: UNNotificationResponse,
+                                withCompletionHandler completionHandler: @escaping () -> Void) {
+        let userInfo = response.notification.request.content.userInfo
+        print("Notification tapped: \(userInfo)")
+
+        // Handle navigation based on notification data
+        handleNotificationTap(userInfo)
+
+        completionHandler()
+    }
+
+    // MARK: - Backend Communication
+
+    func registerDeviceToken(_ fcmToken: String) {
+        guard let userId = UserDefaults.standard.string(forKey: "user_id") else {
+            print("No user ID found")
+            return
+        }
+
+        NotificationService.shared.registerDeviceToken(userId: userId, fcmToken: fcmToken)
+    }
+
+    func handleNotificationTap(_ userInfo: [AnyHashable: Any]) {
+        // Extract data from notification
+        if let userId = userInfo["userId"] as? String {
+            print("Navigate to user: \(userId)")
+            // Implement your navigation logic here
+        }
+    }
+}
 ```
+
+#### Step 4B.4: Create Notification Service
+
+**File**: `Services/NotificationService.swift`
+
+```swift
+import Foundation
+import FirebaseMessaging
+
+class NotificationService {
+
+    static let shared = NotificationService()
+
+    private let baseURL = "https://your-api-url.com"
+
+    private init() {}
+
+    func initialize(userId: String) {
+        // Save user ID
+        UserDefaults.standard.set(userId, forKey: "user_id")
+
+        // Get FCM token
+        Messaging.messaging().token { token, error in
+            if let error = error {
+                print("Error fetching FCM token: \(error)")
+                return
+            }
+
+            if let token = token {
+                print("FCM Token: \(token)")
+                self.registerDeviceToken(userId: userId, fcmToken: token)
+            }
+        }
+    }
+
+    func registerDeviceToken(userId: String, fcmToken: String) {
+        guard let url = URL(string: "\(baseURL)/api/users/register-device") else {
+            print("Invalid URL")
+            return
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+        let body: [String: Any] = [
+            "userId": userId,
+            "fcmToken": fcmToken
+        ]
+
+        do {
+            request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        } catch {
+            print("Error serializing JSON: \(error)")
+            return
+        }
+
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                print("Error registering device token: \(error)")
+                return
+            }
+
+            if let httpResponse = response as? HTTPURLResponse {
+                if httpResponse.statusCode == 200 {
+                    print("Device token registered successfully")
+                } else {
+                    print("Failed to register device token: \(httpResponse.statusCode)")
+                }
+            }
+        }.resume()
+    }
+}
+```
+
+#### Step 4B.5: Initialize After Login
+
+**File**: `ViewControllers/LoginViewController.swift` (or wherever you handle login)
+
+```swift
+// After successful login
+let userId = loginResponse.userId
+NotificationService.shared.initialize(userId: userId)
+```
+
+#### Step 4B.6: Handle Notification Permissions
+
+**File**: `Helpers/NotificationPermissionHelper.swift`
+
+```swift
+import UserNotifications
+
+class NotificationPermissionHelper {
+
+    static func checkPermissionStatus(completion: @escaping (Bool) -> Void) {
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            DispatchQueue.main.async {
+                completion(settings.authorizationStatus == .authorized)
+            }
+        }
+    }
+
+    static func requestPermission(completion: @escaping (Bool) -> Void) {
+        let authOptions: UNAuthorizationOptions = [.alert, .badge, .sound]
+        UNUserNotificationCenter.current().requestAuthorization(options: authOptions) { granted, error in
+            DispatchQueue.main.async {
+                completion(granted)
+            }
+        }
+    }
+}
+```
+
+#### Step 4B.7: Upload APNs Certificate to Firebase
+
+1. Go to [Apple Developer Portal](https://developer.apple.com/account)
+2. Navigate to **Certificates, Identifiers & Profiles**
+3. Create an **APNs Authentication Key** (recommended) or **APNs Certificate**
+4. Download the key/certificate
+5. In Firebase Console:
+   - Go to **Project Settings** → **Cloud Messaging** → **iOS app configuration**
+   - Upload your APNs key or certificate
 
 ---
 
@@ -1119,21 +1452,40 @@ chmod 644 src/AICalendar.API/firebase-credentials.json
 ### Issue 5: "Android notifications not showing"
 
 **Solution**:
-- Create notification channel:
-  ```dart
-  const AndroidNotificationChannel channel = AndroidNotificationChannel(
-    'payment_reminders',
-    'Payment Reminders',
-    importance: Importance.high,
-  );
-  ```
+
+- Verify notification channel is created (already in FCMService)
+- Check notification permission granted (Android 13+)
+- Verify `google-services.json` is in correct location
+- Check logcat for FCM errors: `adb logcat | grep FCM`
+- Ensure app is not in battery optimization/doze mode
 
 ### Issue 6: "iOS notifications not showing"
 
 **Solution**:
-- Enable Push Notifications in Xcode
-- Add Notification Service Extension
-- Verify APNs certificate in Firebase Console
+
+- Enable Push Notifications capability in Xcode
+- Verify APNs certificate/key uploaded to Firebase Console
+- Check device is not in Do Not Disturb mode
+- Test on physical device (push notifications don't work on simulator)
+- Check Xcode console for registration errors
+
+### Issue 7: "Kotlin app crashes on FCM initialization"
+
+**Solution**:
+
+- Verify `google-services.json` exists in `app/` folder
+- Check Gradle plugin is applied: `apply plugin: 'com.google.gms.google-services'`
+- Sync Gradle files
+- Clean and rebuild project
+
+### Issue 8: "Swift app not receiving APNs token"
+
+**Solution**:
+
+- Verify app is signed with correct provisioning profile
+- Check APNs entitlements are enabled
+- Test on physical device (not simulator)
+- Check for errors in `didFailToRegisterForRemoteNotificationsWithError`
 
 ---
 
@@ -1143,8 +1495,11 @@ chmod 644 src/AICalendar.API/firebase-credentials.json
 
 - [Firebase Cloud Messaging Docs](https://firebase.google.com/docs/cloud-messaging)
 - [Firebase Admin .NET SDK](https://firebase.google.com/docs/admin/setup#dotnet)
-- [Flutter Firebase Messaging](https://firebase.flutter.dev/docs/messaging/overview)
-- [Firebase JS SDK](https://firebase.google.com/docs/web/setup)
+- [Firebase Cloud Messaging for Android](https://firebase.google.com/docs/cloud-messaging/android/client)
+- [Firebase Cloud Messaging for iOS](https://firebase.google.com/docs/cloud-messaging/ios/client)
+- [Kotlin Coroutines Guide](https://kotlinlang.org/docs/coroutines-guide.html)
+- [Swift URLSession Documentation](https://developer.apple.com/documentation/foundation/urlsession)
+- [APNs Overview](https://developer.apple.com/documentation/usernotifications)
 
 ### Testing Tools
 
@@ -1187,16 +1542,31 @@ After successful implementation:
 - [ ] UserRepository created
 - [ ] API endpoints for device registration created
 
-### Frontend
-- [ ] Firebase SDK installed
-- [ ] Firebase initialized
+### Android (Kotlin) Frontend
+
+- [ ] Firebase SDK added to Gradle
+- [ ] `google-services.json` added to app folder
+- [ ] Google Services plugin applied
+- [ ] FCMService created and registered in manifest
+- [ ] Notification channel created
+- [ ] Permissions requested (Android 13+)
+- [ ] FCM token retrieved and sent to backend
+- [ ] NotificationManager initialized after login
+
+### iOS (Swift) Frontend
+
+- [ ] Firebase SDK installed via CocoaPods or SPM
+- [ ] `GoogleService-Info.plist` added to Xcode project
+- [ ] Push Notifications capability enabled
+- [ ] Background Modes (Remote notifications) enabled
+- [ ] AppDelegate configured with FCM
 - [ ] Permissions requested
-- [ ] FCM token retrieved
-- [ ] Token sent to backend
-- [ ] Notification handlers implemented
-- [ ] Background message handler configured
+- [ ] APNs certificate/key uploaded to Firebase
+- [ ] FCM token retrieved and sent to backend
+- [ ] NotificationService initialized after login
 
 ### Testing
+
 - [ ] Device token registered successfully
 - [ ] Test notification received
 - [ ] Reminder notification triggered and received
@@ -1205,6 +1575,7 @@ After successful implementation:
 - [ ] Notification tap navigation working
 
 ### Production
+
 - [ ] Firebase credentials secured
 - [ ] Environment configuration set
 - [ ] Monitoring enabled

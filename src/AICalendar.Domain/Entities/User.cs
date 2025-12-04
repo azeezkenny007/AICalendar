@@ -12,6 +12,10 @@ public class User : Entity<UserId>
     public DateTime CreatedAt { get; private set; }
     public DateTime? UpdatedAt { get; private set; }
 
+    // Firebase Cloud Messaging device token
+    public string? FcmDeviceToken { get; private set; }
+    public DateTime? FcmTokenUpdatedAt { get; private set; }
+
     private readonly List<Transaction> _transactions = new();
     public IReadOnlyCollection<Transaction> Transactions => _transactions.AsReadOnly();
 
@@ -46,5 +50,28 @@ public class User : Entity<UserId>
             throw new ArgumentException("Email cannot be empty", nameof(email));
 
         return new User(UserId.Create(), firstName, lastName, username, email);
+    }
+
+    /// <summary>
+    /// Updates the user's FCM device token for push notifications
+    /// </summary>
+    public void UpdateDeviceToken(string fcmToken)
+    {
+        if (string.IsNullOrWhiteSpace(fcmToken))
+            throw new ArgumentException("FCM token cannot be empty", nameof(fcmToken));
+
+        FcmDeviceToken = fcmToken;
+        FcmTokenUpdatedAt = DateTime.UtcNow;
+        UpdatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Clears the user's FCM device token (e.g., when token is invalid or user logs out)
+    /// </summary>
+    public void ClearDeviceToken()
+    {
+        FcmDeviceToken = null;
+        FcmTokenUpdatedAt = null;
+        UpdatedAt = DateTime.UtcNow;
     }
 }

@@ -414,3 +414,6 @@ appsettings.Production.json
 
 # Entity Framework Migrations
 **/Migrations/
+
+# Firebase credentials
+**/firebase-credentials.json

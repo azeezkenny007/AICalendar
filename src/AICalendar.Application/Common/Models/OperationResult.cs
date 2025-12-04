@@ -50,6 +50,12 @@ public class OperationResult : Result
     /// </summary>
     public static OperationResult Conflict(string title, string error, string detail)
         => new(false, 409, error, title, detail, null);
+
+    /// <summary>
+    /// Creates a server error result (500 Internal Server Error)
+    /// </summary>
+    public static OperationResult ServerError(string title, string error, string detail)
+        => new(false, 500, error, title, detail, null);
 }
 
 /// <summary>

@@ -1,6 +1,7 @@
-using AICalendar.Application.Common.Interfaces;
-using AICalendar.Domain.Interfaces;
-using AICalendar.Domain.ValueObjects;
+using AICalendar.Application.Users.Commands.RegisterDevice;
+using AICalendar.Application.Users.Commands.TestNotification;
+using AICalendar.Application.Users.Commands.UnregisterDevice;
+using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AICalendar.API.Controllers;
@@ -13,21 +14,11 @@ namespace AICalendar.API.Controllers;
 [Produces("application/json")]
 public class UsersController : ControllerBase
 {
-    private readonly IUserRepository _userRepository;
-    private readonly IUnitOfWork _unitOfWork;
-    private readonly INotificationService _notificationService;
-    private readonly ILogger<UsersController> _logger;
+    private readonly IMediator _mediator;
 
-    public UsersController(
-        IUserRepository userRepository,
-        IUnitOfWork unitOfWork,
-        INotificationService notificationService,
-        ILogger<UsersController> logger)
+    public UsersController(IMediator mediator)
     {
-        _userRepository = userRepository;
-        _unitOfWork = unitOfWork;
-        _notificationService = notificationService;
-        _logger = logger;
+        _mediator = mediator;
     }
 
     /// <summary>
@@ -60,38 +51,17 @@ public class UsersController : ControllerBase
     public async Task<IActionResult> RegisterDevice(
         [FromBody] RegisterDeviceRequest request)
     {
-        try
-        {
-            var user = await _userRepository.GetByIdAsync(
-                UserId.Create(request.UserId)
-            );
+        var command = new RegisterDeviceCommand(request.UserId, request.FcmToken);
+        var result = await _mediator.Send(command);
 
-            if (user == null)
+        return result.IsSuccess
+            ? Ok(new { message = result.Title })
+            : result.StatusCode switch
             {
-                return NotFound(new { message = $"User {request.UserId} not found" });
-            }
-
-            user.UpdateDeviceToken(request.FcmToken);
-            await _userRepository.UpdateAsync(user);
-            await _unitOfWork.SaveChangesAsync();
-
-            _logger.LogInformation(
-                "Registered FCM token for user {UserId}",
-                request.UserId
-            );
-
-            return Ok(new { message = "Device registered successfully" });
-        }
-        catch (ArgumentException ex)
-        {
-            _logger.LogWarning(ex, "Invalid request for device registration");
-            return BadRequest(new { message = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error registering device token");
-            return StatusCode(500, new { message = "An error occurred while registering device" });
-        }
+                404 => NotFound(new { message = result.Error }),
+                400 => BadRequest(new { message = result.Error }),
+                _ => StatusCode(500, new { message = result.Error })
+            };
     }
 
     /// <summary>
@@ -119,39 +89,17 @@ public class UsersController : ControllerBase
     [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> TestNotification(Guid userId)
     {
-        try
-        {
-            var user = await _userRepository.GetByIdAsync(UserId.Create(userId));
-            if (user == null)
+        var command = new TestNotificationCommand(userId);
+        var result = await _mediator.Send(command);
+
+        return result.IsSuccess
+            ? Ok(new { message = result.Title })
+            : result.StatusCode switch
             {
-                return NotFound(new { message = $"User {userId} not found" });
-            }
-
-            if (string.IsNullOrEmpty(user.FcmDeviceToken))
-            {
-                return BadRequest(new { message = "User has no registered device token" });
-            }
-
-            await _notificationService.SendPushNotificationAsync(
-                UserId.Create(userId),
-                "Test Notification",
-                "This is a test notification from AICalendar",
-                new Dictionary<string, string>
-                {
-                    { "type", "test" },
-                    { "timestamp", DateTime.UtcNow.ToString("O") }
-                }
-            );
-
-            _logger.LogInformation("Sent test notification to user {UserId}", userId);
-
-            return Ok(new { message = "Test notification sent successfully" });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error sending test notification");
-            return StatusCode(500, new { message = "An error occurred while sending notification" });
-        }
+                404 => NotFound(new { message = result.Error }),
+                400 => BadRequest(new { message = result.Error }),
+                _ => StatusCode(500, new { message = result.Error })
+            };
     }
 
     /// <summary>
@@ -177,27 +125,16 @@ public class UsersController : ControllerBase
     [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> UnregisterDevice(Guid userId)
     {
-        try
-        {
-            var user = await _userRepository.GetByIdAsync(UserId.Create(userId));
-            if (user == null)
+        var command = new UnregisterDeviceCommand(userId);
+        var result = await _mediator.Send(command);
+
+        return result.IsSuccess
+            ? Ok(new { message = result.Title })
+            : result.StatusCode switch
             {
-                return NotFound(new { message = $"User {userId} not found" });
-            }
-
-            user.ClearDeviceToken();
-            await _userRepository.UpdateAsync(user);
-            await _unitOfWork.SaveChangesAsync();
-
-            _logger.LogInformation("Cleared FCM token for user {UserId}", userId);
-
-            return Ok(new { message = "Device unregistered successfully" });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error unregistering device");
-            return StatusCode(500, new { message = "An error occurred while unregistering device" });
-        }
+                404 => NotFound(new { message = result.Error }),
+                _ => StatusCode(500, new { message = result.Error })
+            };
     }
 }
 

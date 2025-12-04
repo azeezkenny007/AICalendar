@@ -36,6 +36,13 @@ public class EditCalendarItemCommandValidator : AbstractValidator<EditCalendarIt
             .When(x => x.DueDate.HasValue)
             .WithMessage("Due date cannot be empty if provided");
 
+        When(x => x.DueDate.HasValue, () =>
+        {
+            RuleFor(x => x.DueDate!.Value)
+                .LessThanOrEqualTo(_ => DateTime.UtcNow.AddMonths(2))
+                .WithMessage("Due date cannot be more than 2 months in the future");
+        });
+
         RuleFor(x => x.Account)
             .NotEmpty()
             .When(x => x.Account != null)

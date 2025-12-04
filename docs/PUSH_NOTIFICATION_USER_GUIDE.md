@@ -811,41 +811,452 @@ fGcI7X8kRZuQ9H7rL4kP5mN2jC6dV8wX1yZ3aB4cD5eF6gH7iJ8kL9mN0oP1qR2sT3uV4wX5yZ6...
 
 ## Automated Reminder Notifications
 
-### Background Job Schedule
+### Background Job Overview
 
-AICalendar automatically sends reminder notifications for upcoming payments using Hangfire:
+AICalendar uses **Hangfire** to automatically send push notifications for upcoming and overdue payments. The system runs a scheduled background job that checks all unpaid calendar items and sends timely reminders to users.
 
-- **Schedule**: Every 30 minutes
-- **Job**: `SendRemindersJob`
-- **Logic**: Sends notifications for items due within the next 24 hours
+### Background Job Configuration
+
+The reminder system is configured in the `HangfireConfiguration.cs` file:
+
+**File**: `src/AICalendar.Infrastructure/BackgroundJobs/HangfireConfiguration.cs`
+
+```csharp
+// JOB 4: Send Reminders (Every Hour)
+var remindersCron = configuration["BackgroundJobs:SendReminders:CronExpression"]
+    ?? Cron.Hourly(); // Default: Every hour
+
+recurringJobManager.AddOrUpdate<SendRemindersJob>(
+    "send-reminders",
+    job => job.SendDueReminders(),
+    remindersCron,
+    new RecurringJobOptions
+    {
+        TimeZone = TimeZoneInfo.Utc
+    });
+```
+
+### Job Schedule
+
+- **Frequency**: Every hour (by default)
+- **Job Name**: `send-reminders`
+- **Job Class**: `SendRemindersJob`
+- **Method**: `SendDueReminders()`
+- **Timezone**: UTC
+
+### How It Works
+
+The `SendRemindersJob` performs the following steps every hour:
+
+1. **Fetch Unpaid Items**: Queries the database for all unpaid calendar items with due dates
+2. **Check Time Windows**: Evaluates each item against multiple notification time windows
+3. **Send Notifications**: Sends FCM push notifications to users whose items match a time window
+4. **Log Results**: Records how many notifications were sent
+
+### Notification Time Windows
+
+The job sends notifications at these intervals:
+
+#### Before Due Date
+- **24 hours before**: "Payment Due Soon: {merchant} - ${amount} due in 24 hours"
+- **6 hours before**: "Payment Due Soon: {merchant} - ${amount} due in 6 hours"
+- **1 hour before**: "Payment Due Soon: {merchant} - ${amount} due in 1 hour"
+
+#### After Due Date (Overdue)
+- **12 hours overdue**: "Payment Overdue: {merchant} - ${amount} was due 12 hours ago"
+- **24 hours overdue**: "Payment Overdue: {merchant} - ${amount} was due 24 hours ago"
+- **48 hours overdue**: "Payment Overdue: {merchant} - ${amount} was due 48 hours ago"
+
+### Code Implementation
+
+**File**: `src/AICalendar.Application/BackgroundJobs/SendRemindersJob.cs`
+
+```csharp
+public async Task SendDueReminders()
+{
+    _logger.LogInformation("Starting reminder processing at {Time}", DateTime.UtcNow);
+
+    // Get all unpaid calendar items with payment due dates
+    var unpaidItems = await _calendarRepository.GetUnpaidItemsWithDueDatesAsync();
+
+    if (!unpaidItems.Any())
+    {
+        _logger.LogInformation("No unpaid items found. Skipping reminder processing.");
+        return;
+    }
+
+    var notificationsSent = 0;
+    var now = DateTime.UtcNow;
+
+    foreach (var (item, userId) in unpaidItems)
+    {
+        var paymentDue = item.DueDate;
+        string? notificationMessage = null;
+
+        // Check each time window
+        if (now >= paymentDue.AddHours(-24) && now < paymentDue.AddHours(-23))
+        {
+            notificationMessage = $"Payment Due Soon: {item.Merchant} - ${item.Amount:F2} due in 24 hours";
+        }
+        else if (now >= paymentDue.AddHours(-6) && now < paymentDue.AddHours(-5))
+        {
+            notificationMessage = $"Payment Due Soon: {item.Merchant} - ${item.Amount:F2} due in 6 hours";
+        }
+        // ... more time windows ...
+
+        // Send notification if a time window matched
+        if (!string.IsNullOrEmpty(notificationMessage))
+        {
+            await _notificationService.SendPushNotificationAsync(
+                userId: userId,
+                title: "AICalendar Payment Reminder",
+                message: notificationMessage,
+                data: new Dictionary<string, string>
+                {
+                    { "calendarItemId", item.Id.Value.ToString() },
+                    { "type", "payment_reminder" },
+                    { "merchant", item.Merchant },
+                    { "amount", item.Amount.ToString("F2") },
+                    { "dueDate", paymentDue.ToString("O") }
+                }
+            );
+
+            notificationsSent++;
+        }
+    }
+
+    _logger.LogInformation(
+        "Reminder processing completed. Sent {SentCount} notifications out of {TotalCount} unpaid items",
+        notificationsSent,
+        unpaidItems.Count
+    );
+}
+```
 
 ### Reminder Notification Format
 
+When a notification is sent, it has the following structure:
+
 ```json
 {
-  "title": "Payment Reminder",
-  "body": "{merchant} payment of ${amount} is due on {dueDate}",
+  "title": "AICalendar Payment Reminder",
+  "body": "Payment Due Soon: Netflix - $15.99 due in 24 hours (Jan 15, 11:00 PM UTC)",
   "data": {
     "type": "payment_reminder",
-    "calendarItemId": "item-guid",
+    "calendarItemId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
     "merchant": "Netflix",
     "amount": "15.99",
-    "dueDate": "2025-01-15T00:00:00Z"
+    "dueDate": "2025-01-15T23:00:00.0000000Z"
   }
 }
 ```
 
-### Customization
+### How to Use Reminder Data in Your App
 
-To modify reminder timing or frequency, update the Hangfire configuration:
+When your mobile app receives a reminder notification, use the `data` payload to handle it appropriately:
+
+#### iOS (Swift)
+
+```swift
+extension AppDelegate: UNUserNotificationCenterDelegate {
+    func userNotificationCenter(_ center: UNUserNotificationCenter,
+                              didReceive response: UNNotificationResponse,
+                              withCompletionHandler completionHandler: @escaping () -> Void) {
+        let userInfo = response.notification.request.content.userInfo
+
+        // Check if it's a payment reminder
+        if let type = userInfo["type"] as? String, type == "payment_reminder" {
+            if let calendarItemId = userInfo["calendarItemId"] as? String,
+               let merchant = userInfo["merchant"] as? String,
+               let amount = userInfo["amount"] as? String {
+
+                // Navigate to the calendar item details
+                navigateToCalendarItem(id: calendarItemId)
+
+                // Or show a quick action to mark as paid
+                showQuickPaymentAction(
+                    itemId: calendarItemId,
+                    merchant: merchant,
+                    amount: amount
+                )
+            }
+        }
+
+        completionHandler()
+    }
+}
+```
+
+#### Android (Kotlin)
+
+```kotlin
+class MyFirebaseMessagingService : FirebaseMessagingService() {
+    override fun onMessageReceived(remoteMessage: RemoteMessage) {
+        super.onMessageReceived(remoteMessage)
+
+        remoteMessage.data.let { data ->
+            if (data["type"] == "payment_reminder") {
+                val calendarItemId = data["calendarItemId"]
+                val merchant = data["merchant"]
+                val amount = data["amount"]
+                val dueDate = data["dueDate"]
+
+                // Create notification with action buttons
+                showReminderNotification(
+                    title = remoteMessage.notification?.title ?: "Payment Reminder",
+                    body = remoteMessage.notification?.body ?: "",
+                    calendarItemId = calendarItemId,
+                    merchant = merchant,
+                    amount = amount
+                )
+            }
+        }
+    }
+
+    private fun showReminderNotification(
+        title: String,
+        body: String,
+        calendarItemId: String?,
+        merchant: String?,
+        amount: String?
+    ) {
+        // Create intent to open calendar item
+        val viewIntent = Intent(this, CalendarDetailActivity::class.java).apply {
+            putExtra("calendarItemId", calendarItemId)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
+        val viewPendingIntent = PendingIntent.getActivity(
+            this, 0, viewIntent, PendingIntent.FLAG_IMMUTABLE
+        )
+
+        // Create intent to mark as paid
+        val markPaidIntent = Intent(this, MarkAsPaidService::class.java).apply {
+            putExtra("calendarItemId", calendarItemId)
+        }
+        val markPaidPendingIntent = PendingIntent.getService(
+            this, 1, markPaidIntent, PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(this, "reminders_channel")
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(title)
+            .setContentText(body)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setContentIntent(viewPendingIntent)
+            .addAction(R.drawable.ic_check, "Mark as Paid", markPaidPendingIntent)
+            .addAction(R.drawable.ic_view, "View Details", viewPendingIntent)
+            .setAutoCancel(true)
+            .build()
+
+        NotificationManagerCompat.from(this).notify(2, notification)
+    }
+}
+```
+
+### Customization Options
+
+#### 1. Change Notification Frequency
+
+Modify the cron expression in `appsettings.json`:
+
+```json
+{
+  "BackgroundJobs": {
+    "SendReminders": {
+      "CronExpression": "0 */30 * * * *"  // Every 30 minutes
+    }
+  }
+}
+```
+
+Common cron expressions:
+- Every 30 minutes: `"0 */30 * * * *"`
+- Every 15 minutes: `"0 */15 * * * *"`
+- Every 2 hours: `"0 0 */2 * * *"`
+- Every day at 8 AM: `"0 0 8 * * *"`
+
+#### 2. Modify Notification Time Windows
+
+Edit the time windows in `SendRemindersJob.cs`:
 
 ```csharp
-// In Program.cs or HangfireServiceExtensions.cs
-RecurringJob.AddOrUpdate<ISendRemindersJob>(
-    "send-reminders",
-    job => job.ExecuteAsync(),
-    Cron.Minutely(30) // Change this to adjust frequency
-);
+// Example: Add a 3-hour warning
+else if (now >= paymentDue.AddHours(-3) && now < paymentDue.AddHours(-2))
+{
+    notificationMessage = $"Payment Due Soon: {item.Merchant} - ${item.Amount:F2} due in 3 hours";
+}
+```
+
+#### 3. Disable Specific Time Windows
+
+Comment out unwanted time windows:
+
+```csharp
+// Disable overdue notifications
+// else if (now >= paymentDue.AddHours(12) && now < paymentDue.AddHours(13))
+// {
+//     notificationMessage = $"Payment Overdue: {item.Merchant} - ${amount} was due 12 hours ago";
+// }
+```
+
+#### 4. Change Notification Messages
+
+Customize the notification text:
+
+```csharp
+notificationMessage = $"⏰ Hey! Your {item.Merchant} payment of ${item.Amount:F2} is due in 24 hours!";
+```
+
+### Monitoring Background Jobs
+
+#### View Job Status in Hangfire Dashboard
+
+1. Navigate to: `https://your-api-url/hangfire`
+2. Click on "Recurring Jobs"
+3. Find "send-reminders" job
+4. View:
+   - Last execution time
+   - Next execution time
+   - Success/failure history
+
+#### Check Logs
+
+The job logs important information:
+
+```
+[INFO] Starting reminder processing at 2025-01-04T10:00:00Z
+[INFO] Found 15 unpaid items to check
+[INFO] Sent reminder for item abc123 to user xyz789: Payment Due Soon: Netflix - $15.99 due in 24 hours
+[INFO] Reminder processing completed. Sent 5 notifications out of 15 unpaid items
+```
+
+#### Trigger Job Manually
+
+You can manually trigger the reminder job for testing:
+
+```bash
+# Using curl to trigger Hangfire job
+curl -X POST https://your-api-url/hangfire/jobs/enqueue \
+  -H "Content-Type: application/json" \
+  -d '{"job": "send-reminders"}'
+```
+
+Or via Hangfire Dashboard:
+1. Go to "Recurring Jobs"
+2. Find "send-reminders"
+3. Click "Trigger Now"
+
+### Testing the Reminder System
+
+#### Step 1: Create a Test Calendar Item
+
+Create a calendar item with a due date in the near future:
+
+```bash
+curl -X POST https://api.aicalendar.com/api/calendar/items \
+  -H "Content-Type: application/json" \
+  -d '{
+    "userId": "your-user-id",
+    "merchant": "Test Payment",
+    "amount": 10.00,
+    "dueDate": "2025-01-05T12:00:00Z"  // Set to ~24 hours from now
+  }'
+```
+
+#### Step 2: Register Device Token
+
+Ensure your device token is registered:
+
+```bash
+curl -X POST https://api.aicalendar.com/api/users/register-device \
+  -H "Content-Type: application/json" \
+  -d '{
+    "userId": "your-user-id",
+    "fcmToken": "your-fcm-token"
+  }'
+```
+
+#### Step 3: Wait or Trigger Job
+
+- **Wait**: Let the hourly job run automatically
+- **Trigger**: Manually trigger the job via Hangfire Dashboard
+
+#### Step 4: Verify Notification
+
+- Check your mobile device for the notification
+- Check Hangfire logs for confirmation
+- Verify the notification contains correct data
+
+### Troubleshooting Reminders
+
+#### Notifications Not Sending
+
+**Check 1: Job is Running**
+```bash
+# Check Hangfire dashboard
+# Verify "send-reminders" is enabled and executing
+```
+
+**Check 2: User Has Device Token**
+```sql
+SELECT Id, Email, FcmDeviceToken
+FROM Users
+WHERE Id = 'your-user-id';
+```
+
+**Check 3: Items Are Unpaid**
+```sql
+SELECT * FROM CalendarItems
+WHERE IsPaid = 0
+AND DueDate IS NOT NULL;
+```
+
+**Check 4: Time Window Matches**
+- Ensure current time matches one of the time windows
+- Check job logs for processing details
+
+**Check 5: Firebase Credentials**
+- Verify `firebase-credentials.json` exists
+- Check Firebase Console for delivery reports
+
+#### Duplicate Notifications
+
+**Problem**: User receives the same notification multiple times
+
+**Solution**: The time windows are designed with 1-hour gaps to prevent duplicates. If you reduce the job frequency below 1 hour, you may get duplicates.
+
+**Fix**:
+```csharp
+// Add tracking to prevent duplicate sends
+private static HashSet<string> _sentNotifications = new();
+
+var notificationKey = $"{item.Id}_{timeWindow}";
+if (_sentNotifications.Contains(notificationKey))
+{
+    continue; // Skip already sent
+}
+
+// Send notification...
+_sentNotifications.Add(notificationKey);
+```
+
+#### Performance Issues
+
+**Problem**: Job takes too long to process many items
+
+**Solution 1**: Add pagination
+```csharp
+var batchSize = 100;
+var unpaidItems = await _calendarRepository
+    .GetUnpaidItemsWithDueDatesAsync(limit: batchSize);
+```
+
+**Solution 2**: Parallel processing
+```csharp
+await Parallel.ForEachAsync(unpaidItems, async (item, cancellationToken) =>
+{
+    // Send notification...
+});
 ```
 
 ---

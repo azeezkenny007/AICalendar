@@ -1,16 +1,20 @@
 using AICalendar.API.Middleware;
 using AICalendar.Application.Common.Behaviors;
+using AICalendar.Application.Common.Interfaces;
 using AICalendar.Domain.Interfaces;
 using AICalendar.Domain.Services;
 using AICalendar.Infrastructure.Data;
 using AICalendar.Infrastructure.Persistence.Repositories;
 using AICalendar.Infrastructure.Persistence.UnitOfWork;
 using AICalendar.Infrastructure.ExternalServices.Cache;
+using AICalendar.Infrastructure.Services;
 using AICalendar.API.Extensions;
 using AICalendar.API.Filters;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using AICalendar.Application.BackgroundJobs;
+using FirebaseAdmin;
+using Google.Apis.Auth.OAuth2;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -82,7 +86,7 @@ builder.Services.AddScoped<IApplicationDbContext>(provider => provider.GetRequir
 builder.Services.AddScoped<ITransactionRepository, TransactionRepository>();
 builder.Services.AddScoped<IPredictionRepository, PredictionRepository>();
 builder.Services.AddScoped<ICalendarRepository, CalendarRepository>();
-
+builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IUserFeedbackRepository, UserFeedbackRepository>();
 
 // Register Domain Services
@@ -117,6 +121,33 @@ builder.Services.AddHangfireServices(builder.Configuration);
 
 // Register Cache Services (Redis or Null based on configuration)
 builder.Services.AddCacheServices(builder.Configuration);
+
+// ═══════════════════════════════════════════════════════════
+// Firebase Cloud Messaging Configuration
+// ═══════════════════════════════════════════════════════════
+var firebaseCredentialsPath = Path.Combine(
+    builder.Environment.ContentRootPath,
+    "firebase-credentials.json"
+);
+
+if (File.Exists(firebaseCredentialsPath))
+{
+    FirebaseApp.Create(new AppOptions
+    {
+        Credential = GoogleCredential.FromFile(firebaseCredentialsPath)
+    });
+
+    builder.Services.AddScoped<INotificationService, FirebaseNotificationService>();
+
+    Console.WriteLine("✅ Firebase Cloud Messaging initialized");
+}
+else
+{
+    Console.WriteLine("⚠️  WARNING: firebase-credentials.json not found. Notifications disabled.");
+
+    // Register a null/dummy service for development
+    builder.Services.AddScoped<INotificationService, NullNotificationService>();
+}
 
 
 var app = builder.Build();

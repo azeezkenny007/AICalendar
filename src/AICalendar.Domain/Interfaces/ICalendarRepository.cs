@@ -11,4 +11,9 @@ public interface ICalendarRepository
     Task AddAsync(Calendar calendar, CancellationToken cancellationToken = default);
     Task UpdateAsync(Calendar calendar, CancellationToken cancellationToken = default);
     Task DeleteAsync(Calendar calendar, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets all unpaid calendar items across all users with their associated user IDs
+    /// </summary>
+    Task<List<(CalendarItem Item, UserId UserId)>> GetUnpaidItemsWithDueDatesAsync(CancellationToken cancellationToken = default);
 }

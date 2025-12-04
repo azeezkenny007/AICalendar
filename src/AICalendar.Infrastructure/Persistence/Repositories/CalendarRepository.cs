@@ -52,4 +52,17 @@ public class CalendarRepository : ICalendarRepository
         _context.Set<Calendar>().Remove(calendar);
         return Task.CompletedTask;
     }
+
+    public async Task<List<(CalendarItem Item, UserId UserId)>> GetUnpaidItemsWithDueDatesAsync(CancellationToken cancellationToken = default)
+    {
+        var calendars = await _context.Set<Calendar>()
+            .Include(c => c.Items)
+            .ToListAsync(cancellationToken);
+
+        return calendars
+            .SelectMany(c => c.Items
+                .Where(item => !item.IsPaid)
+                .Select(item => (Item: item, UserId: c.UserId)))
+            .ToList();
+    }
 }

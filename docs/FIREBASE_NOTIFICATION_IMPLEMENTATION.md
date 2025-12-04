@@ -168,6 +168,7 @@ DateTime.UtcNow >= item.PaymentDue.AddHours(48) && DateTime.UtcNow < item.Paymen
 4. If disabled, click **"Enable"**
 5. Note down the **Server Key** (you won't use this, but good to know)
 
+
 ### Step 1.4: Generate Service Account Key
 
 **CRITICAL STEP** - This allows your backend to send notifications
@@ -175,6 +176,8 @@ DateTime.UtcNow >= item.PaymentDue.AddHours(48) && DateTime.UtcNow < item.Paymen
 1. In Firebase Console, go to **Project Settings** → **Service accounts**
 2. Click **"Generate new private key"**
 3. Click **"Generate key"** (JSON file downloads)
+
+
 4. **Rename** the file to: `firebase-credentials.json`
 5. **Move** to: `src/AICalendar.API/firebase-credentials.json`
 

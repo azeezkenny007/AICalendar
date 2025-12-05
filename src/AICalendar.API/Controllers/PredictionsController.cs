@@ -95,7 +95,7 @@ public class PredictionsController : ControllerBase
     /// <summary>
     /// Processes a batch of prediction items, accepting or rejecting them
     /// </summary>
-    /// <param name="request">The list of accepted and rejected item IDs</param>
+    /// <param name="request">The list of accepted and/or rejected item IDs (at least one array should be provided)</param>
     /// <returns>Success status</returns>
     /// <response code="200">If the batch was successfully processed</response>
     /// <response code="400">If the request is invalid</response>
@@ -105,8 +105,8 @@ public class PredictionsController : ControllerBase
     public async Task<IActionResult> BatchProcess([FromBody] BatchProcessRequest request)
     {
         var command = new BatchProcessPredictionItemsCommand(
-            request.AcceptedItemIds.Select(id => PredictionItemId.Create(id)).ToList(),
-            request.RejectedItemIds.Select(id => PredictionItemId.Create(id)).ToList()
+            (request.AcceptedItemIds ?? new List<Guid>()).Select(id => PredictionItemId.Create(id)).ToList(),
+            (request.RejectedItemIds ?? new List<Guid>()).Select(id => PredictionItemId.Create(id)).ToList()
         );
 
         var result = await _mediator.Send(command);
@@ -147,6 +147,9 @@ public record EditItemRequest(
 );
 
 /// <summary>
-/// Request model for batch processing prediction items
+/// Request model for batch processing prediction items.
+/// At least one of AcceptedItemIds or RejectedItemIds should be provided.
 /// </summary>
-public record BatchProcessRequest(List<Guid> AcceptedItemIds, List<Guid> RejectedItemIds);
+/// <param name="AcceptedItemIds">Optional list of prediction item IDs to accept</param>
+/// <param name="RejectedItemIds">Optional list of prediction item IDs to reject</param>
+public record BatchProcessRequest(List<Guid>? AcceptedItemIds, List<Guid>? RejectedItemIds);

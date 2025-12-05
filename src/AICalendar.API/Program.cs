@@ -92,6 +92,10 @@ builder.Services.AddScoped<IUserFeedbackRepository, UserFeedbackRepository>();
 // Register Domain Services
 builder.Services.AddScoped<ICalendarDomainService, CalendarDomainService>();
 
+// Register Application Services
+// Register Application Services
+builder.Services.AddHttpClient<AICalendar.Application.Services.IAIPredictionService, AIPredictionService>();
+
 // Register UnitOfWork
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
 

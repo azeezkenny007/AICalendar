@@ -5,7 +5,7 @@ using Polly.CircuitBreaker;
 using Polly.Extensions.Http;
 using Polly.Timeout;
 
-namespace AICalendar.Infrastructure.Services;
+namespace AICalendar.Infrastructure.Resilience;
 
 /// <summary>
 /// Polly resilience policies for AI Prediction Service

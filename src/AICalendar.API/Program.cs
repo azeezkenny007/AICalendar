@@ -95,16 +95,16 @@ builder.Services.AddScoped<IFailedPredictionAttemptRepository, FailedPredictionA
 builder.Services.AddScoped<ICalendarDomainService, CalendarDomainService>();
 
 // Register Resilience Options
-builder.Services.Configure<AICalendar.Infrastructure.Services.ResilienceOptions>(
-    builder.Configuration.GetSection(AICalendar.Infrastructure.Services.ResilienceOptions.SectionName));
+builder.Services.Configure<AICalendar.Infrastructure.Resilience.ResilienceOptions>(
+    builder.Configuration.GetSection(AICalendar.Infrastructure.Resilience.ResilienceOptions.SectionName));
 
 // Register Application Services with Polly Resilience Policies
 builder.Services.AddHttpClient<AICalendar.Application.Services.IAIPredictionService, AIPredictionService>()
     .AddPolicyHandler((services, request) =>
     {
         var logger = services.GetRequiredService<ILogger<AIPredictionService>>();
-        var options = services.GetRequiredService<IOptions<AICalendar.Infrastructure.Services.ResilienceOptions>>().Value;
-        return AICalendar.Infrastructure.Services.AIPredictionServicePolicies.GetResiliencePipeline(logger, options);
+        var options = services.GetRequiredService<IOptions<AICalendar.Infrastructure.Resilience.ResilienceOptions>>().Value;
+        return AICalendar.Infrastructure.Resilience.AIPredictionServicePolicies.GetResiliencePipeline(logger, options);
     });
 
 // Register UnitOfWork

@@ -1,4 +1,4 @@
-namespace AICalendar.Infrastructure.Services;
+namespace AICalendar.Infrastructure.Resilience;
 
 /// <summary>
 /// Configuration options for AI service resilience policies

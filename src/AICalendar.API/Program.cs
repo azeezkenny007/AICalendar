@@ -15,6 +15,7 @@ using Microsoft.EntityFrameworkCore;
 using AICalendar.Application.BackgroundJobs;
 using FirebaseAdmin;
 using Google.Apis.Auth.OAuth2;
+using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -88,13 +89,23 @@ builder.Services.AddScoped<IPredictionRepository, PredictionRepository>();
 builder.Services.AddScoped<ICalendarRepository, CalendarRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IUserFeedbackRepository, UserFeedbackRepository>();
+builder.Services.AddScoped<IFailedPredictionAttemptRepository, FailedPredictionAttemptRepository>();
 
 // Register Domain Services
 builder.Services.AddScoped<ICalendarDomainService, CalendarDomainService>();
 
-// Register Application Services
-// Register Application Services
-builder.Services.AddHttpClient<AICalendar.Application.Services.IAIPredictionService, AIPredictionService>();
+// Register Resilience Options
+builder.Services.Configure<AICalendar.Infrastructure.Services.ResilienceOptions>(
+    builder.Configuration.GetSection(AICalendar.Infrastructure.Services.ResilienceOptions.SectionName));
+
+// Register Application Services with Polly Resilience Policies
+builder.Services.AddHttpClient<AICalendar.Application.Services.IAIPredictionService, AIPredictionService>()
+    .AddPolicyHandler((services, request) =>
+    {
+        var logger = services.GetRequiredService<ILogger<AIPredictionService>>();
+        var options = services.GetRequiredService<IOptions<AICalendar.Infrastructure.Services.ResilienceOptions>>().Value;
+        return AICalendar.Infrastructure.Services.AIPredictionServicePolicies.GetResiliencePipeline(logger, options);
+    });
 
 // Register UnitOfWork
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();

@@ -24,6 +24,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<Calendar> Calendars => Set<Calendar>();
     public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
     public DbSet<UserFeedback> UserFeedbacks => Set<UserFeedback>();
+    public DbSet<FailedPredictionAttempt> FailedPredictionAttempts => Set<FailedPredictionAttempt>();
 
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -38,6 +39,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
         modelBuilder.Ignore<ConfidenceScore>();
         modelBuilder.Ignore<CalendarId>();
         modelBuilder.Ignore<CalendarItemId>();
+        modelBuilder.Ignore<FailedPredictionAttemptId>();
 
         // Apply configurations
         modelBuilder.ApplyConfiguration(new UserConfiguration());
@@ -46,6 +48,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
         modelBuilder.ApplyConfiguration(new CalendarConfiguration());
         modelBuilder.ApplyConfiguration(new OutboxConfiguration());
         modelBuilder.ApplyConfiguration(new UserFeedbackConfiguration());
+        modelBuilder.ApplyConfiguration(new FailedPredictionAttemptConfiguration());
 
 
         // Seed data

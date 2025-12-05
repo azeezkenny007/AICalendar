@@ -1,322 +1,329 @@
 # User Notifications and Reminders API
 
-This document describes the API surface related to user notifications and reminders.
+This document describes how AICalendar handles **user device notifications** and **automated payment reminders**.
 
-> NOTE: This is a starting point based on generic assumptions. Update the endpoint paths, request/response schemas, and auth details to match your actual implementation.
-
-## Overview
-
-The Notifications & Reminders APIs let clients:
-- Create reminders tied to calendar events or standalone.
-- List upcoming reminders for a user.
-- Mark notifications as read / dismissed.
-- Subscribe to notification channels (e.g. email, push, in-app).
-
-All endpoints are assumed to be JSON-over-HTTP.
-
-## Authentication
-
-All endpoints require an authenticated user.
-
-- Auth method: `Bearer <token>` (adjust if you use a different scheme).
-- Include the header: `Authorization: Bearer <access_token>`.
-
-## Base URL
-
-Adjust this section to your environment setup.
-
-- Production: `https://api.example.com`
-- Staging: `https://staging-api.example.com`
-
-All routes in this document are relative to the base URL.
+It is based on the actual implementation in:
+- `src/AICalendar.API/Controllers/UserNotificationsController.cs`
+- `src/AICalendar.Application/BackgroundJobs/SendRemindersJob.cs`
 
 ---
 
-## Reminders
+## User Notifications API
 
-### Create Reminder
+These endpoints manage FCM device registration and test/unregister flows for push notifications.
 
-- **Endpoint**: `POST /v1/reminders`
-- **Description**: Create a new reminder for the authenticated user.
+### Base URL
 
-#### Request body
+```text
+/api/user-notifications
+```
+
+### Endpoints Overview
+
+| Method | Endpoint                                             | Description                               |
+|--------|------------------------------------------------------|-------------------------------------------|
+| POST   | `/api/user-notifications/register-device`            | Register or update FCM device token       |
+| POST   | `/api/user-notifications/test-notification/{userId}` | Send a test push notification             |
+| POST   | `/api/user-notifications/unregister-device/{userId}` | Remove a user's FCM device token          |
+
+> The tables and examples below are aligned with `Users-API-Guide.md` and the controller implementation.
+
+---
+
+### 1. Register Device
+
+Registers or updates a user's Firebase Cloud Messaging (FCM) device token for push notifications.
+
+#### Endpoint
+
+```text
+POST /api/user-notifications/register-device
+```
+
+#### Request Body
 
 ```json path=null start=null
 {
-  "title": "string",
-  "description": "string(optional)",
-  "scheduledAt": "ISO-8601 timestamp",
-  "eventId": "string(optional)",
-  "timezone": "IANA timezone string (e.g. 'America/Los_Angeles')",
-  "channel": "in_app | email | push",
-  "metadata": { "key": "value" }
+  "userId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "fcmToken": "fGcI7X8kRZuQ9..."
 }
 ```
 
-#### Response
+#### Request Parameters
+
+| Parameter | Type | Required | Description                                   |
+|----------|------|----------|-----------------------------------------------|
+| userId   | Guid | Yes      | The unique identifier of the user            |
+| fcmToken | string | Yes    | FCM device token from the Firebase SDK      |
+
+#### Response Codes
+
+| Status Code | Description                                      |
+|------------|--------------------------------------------------|
+| 200        | Device token successfully registered              |
+| 400        | Invalid request data or malformed FCM token       |
+| 404        | User with the specified ID was not found          |
+| 409        | User already has a registered device token (if enforced) |
+| 500        | An unexpected error occurred during registration  |
+
+#### Success Response (200)
 
 ```json path=null start=null
 {
-  "id": "string",
-  "title": "string",
-  "description": "string|null",
-  "scheduledAt": "ISO-8601 timestamp",
-  "eventId": "string|null",
-  "timezone": "string",
-  "channel": "string",
-  "status": "pending | sent | canceled",
-  "createdAt": "ISO-8601 timestamp",
-  "updatedAt": "ISO-8601 timestamp"
+  "message": "Device registered successfully"
 }
 ```
 
-### List Reminders
-
-- **Endpoint**: `GET /v1/reminders`
-- **Description**: List reminders for the authenticated user.
-
-#### Query parameters
-
-- `from` (optional, ISO-8601): Start of time range.
-- `to` (optional, ISO-8601): End of time range.
-- `status` (optional): `pending | sent | canceled`.
-- `limit` (optional, default 50): Max items to return.
-- `cursor` (optional): For pagination.
-
-#### Response
+#### Error Response (404)
 
 ```json path=null start=null
 {
-  "items": [
-    {
-      "id": "string",
-      "title": "string",
-      "scheduledAt": "ISO-8601 timestamp",
-      "status": "pending | sent | canceled"
-    }
-  ],
-  "nextCursor": "string|null"
+  "message": "User {userId} not found"
 }
 ```
 
-### Update Reminder
+#### Usage Notes
 
-- **Endpoint**: `PATCH /v1/reminders/{id}`
-- **Description**: Update fields for an existing reminder.
+- The FCM token **must** be obtained from Firebase SDK on the client device.
+- If a user already has a token registered, the command layer may update it with the new token depending on configuration.
+- Call this endpoint when:
+  - The app starts for the first time.
+  - The FCM token is first generated or refreshed.
+- A registered device is required before the user can receive push notifications or automated reminders.
 
-#### Request body
+#### Example Request (cURL)
 
-All fields optional; only provided fields are updated.
-
-```json path=null start=null
-{
-  "title": "string",
-  "description": "string|null",
-  "scheduledAt": "ISO-8601 timestamp",
-  "timezone": "string",
-  "channel": "in_app | email | push",
-  "status": "pending | canceled"
-}
-```
-
-#### Response
-
-Same as **Create Reminder** response.
-
-### Delete Reminder
-
-- **Endpoint**: `DELETE /v1/reminders/{id}`
-- **Description**: Permanently delete a reminder.
-
-#### Response
-
-```json path=null start=null
-{
-  "success": true
-}
+```bash path=null start=null
+curl -X POST "https://your-api-url.com/api/user-notifications/register-device" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "userId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "fcmToken": "fGcI7X8kRZuQ9..."
+  }'
 ```
 
 ---
 
-## Notifications
+### 2. Test Notification
 
-Notifications represent messages delivered to the user (e.g. reminder fired, event changed, invite received).
+Sends a test push notification to a user's registered device to verify Firebase Cloud Messaging is properly configured.
 
-### List Notifications
+#### Endpoint
 
-- **Endpoint**: `GET /v1/notifications`
-- **Description**: Fetch notifications for the authenticated user.
+```text
+POST /api/user-notifications/test-notification/{userId}
+```
 
-#### Query parameters
+#### URL Parameters
 
-- `status` (optional): `unread | read | dismissed`.
-- `type` (optional): E.g. `event_update`, `reminder_fired`.
-- `limit` (optional, default 50): Max items.
-- `cursor` (optional): Pagination cursor.
+| Parameter | Type | Required | Description                        |
+|----------|------|----------|------------------------------------|
+| userId   | Guid | Yes      | The unique identifier of the user |
 
-#### Response
+#### Response Codes
+
+| Status Code | Description                                      |
+|------------|--------------------------------------------------|
+| 200        | Test notification sent successfully              |
+| 400        | User has no registered device token               |
+| 404        | User with the specified ID was not found          |
+| 500        | An error occurred while sending the notification  |
+
+#### Success Response (200)
 
 ```json path=null start=null
 {
-  "items": [
-    {
-      "id": "string",
-      "type": "string",
-      "title": "string",
-      "body": "string",
-      "createdAt": "ISO-8601 timestamp",
-      "status": "unread | read | dismissed",
-      "data": {
-        "eventId": "string(optional)",
-        "reminderId": "string(optional)"
-      }
-    }
-  ],
-  "nextCursor": "string|null"
+  "message": "Test notification sent successfully"
 }
 ```
 
-### Mark Notification as Read
-
-- **Endpoint**: `POST /v1/notifications/{id}/read`
-- **Description**: Mark the notification as `read`.
-
-#### Response
+#### Error Response (400)
 
 ```json path=null start=null
 {
-  "id": "string",
-  "status": "read"
+  "message": "User has no registered device token"
 }
 ```
 
-### Dismiss Notification
+#### Notification Content
 
-- **Endpoint**: `POST /v1/notifications/{id}/dismiss`
-- **Description**: Mark the notification as `dismissed`.
+The test notification typically contains:
 
-#### Response
+- **Title**: `"Test Notification"`
+- **Body**: `"This is a test notification from AICalendar"`
+- **Data**:
+  - `type`: `"test"`
+  - `timestamp`: Current UTC timestamp in ISO 8601 format
 
-```json path=null start=null
-{
-  "id": "string",
-  "status": "dismissed"
-}
-```
+#### Usage Notes
 
----
+- The user **must** have a registered FCM device token before calling this endpoint.
+- Use this endpoint to validate that:
+  - Firebase Cloud Messaging is correctly configured.
+  - The user's device can receive notifications from AICalendar.
 
-## Notification Channels
+#### Example Request (cURL)
 
-This section documents how users manage their notification preferences.
-
-### Get Notification Settings
-
-- **Endpoint**: `GET /v1/users/me/notification-settings`
-
-#### Response
-
-```json path=null start=null
-{
-  "channels": {
-    "email": {
-      "enabled": true,
-      "reminders": true,
-      "invites": true
-    },
-    "push": {
-      "enabled": true,
-      "reminders": true,
-      "invites": true
-    },
-    "in_app": {
-      "enabled": true,
-      "reminders": true,
-      "invites": true
-    }
-  },
-  "quietHours": {
-    "enabled": false,
-    "start": "22:00",
-    "end": "07:00",
-    "timezone": "America/Los_Angeles"
-  }
-}
-```
-
-### Update Notification Settings
-
-- **Endpoint**: `PUT /v1/users/me/notification-settings`
-
-#### Request body
-
-```json path=null start=null
-{
-  "channels": {
-    "email": {
-      "enabled": true,
-      "reminders": true,
-      "invites": false
-    }
-  },
-  "quietHours": {
-    "enabled": true,
-    "start": "22:00",
-    "end": "07:00",
-    "timezone": "America/Los_Angeles"
-  }
-}
-```
-
-#### Response
-
-Returns the full, updated settings object (same shape as **Get Notification Settings**).
-
----
-
-## Webhooks (Optional)
-
-If your system sends webhooks when reminders fire or notifications are created, document them here.
-
-### Reminder Fired Webhook
-
-- **Event**: `reminder.fired`
-
-#### Payload
-
-```json path=null start=null
-{
-  "id": "string",
-  "type": "reminder.fired",
-  "occurredAt": "ISO-8601 timestamp",
-  "data": {
-    "reminderId": "string",
-    "userId": "string",
-    "scheduledAt": "ISO-8601 timestamp",
-    "channel": "in_app | email | push"
-  }
-}
+```bash path=null start=null
+curl -X POST "https://your-api-url.com/api/user-notifications/test-notification/3fa85f64-5717-4562-b3fc-2c963f66afa6" \
+  -H "Content-Type: application/json"
 ```
 
 ---
 
-## Errors
+### 3. Unregister Device
 
-All endpoints use a common error envelope.
+Removes a user's FCM device token so they stop receiving push notifications.
+
+#### Endpoint
+
+```text
+POST /api/user-notifications/unregister-device/{userId}
+```
+
+#### URL Parameters
+
+| Parameter | Type | Required | Description                        |
+|----------|------|----------|------------------------------------|
+| userId   | Guid | Yes      | The unique identifier of the user |
+
+#### Response Codes
+
+| Status Code | Description                                      |
+|------------|--------------------------------------------------|
+| 200        | Device token successfully removed                 |
+| 400        | User does not have a registered device token      |
+| 404        | User with the specified ID was not found          |
+| 500        | An error occurred while unregistering the device  |
+
+#### Success Response (200)
 
 ```json path=null start=null
 {
-  "error": {
-    "code": "string",
-    "message": "Human-readable message",
-    "details": {}
-  }
+  "message": "Device unregistered successfully"
 }
 ```
 
-Common error codes (customize as needed):
-- `UNAUTHENTICATED` – Missing or invalid auth token.
-- `FORBIDDEN` – User not allowed to access this resource.
-- `NOT_FOUND` – Resource not found.
-- `INVALID_ARGUMENT` – Validation error.
-- `INTERNAL` – Unexpected server-side error.
+#### Error Response (404)
+
+```json path=null start=null
+{
+  "message": "User {userId} not found"
+}
+```
+
+#### Usage Notes
+
+- Call this endpoint when a user logs out or explicitly opts out of push notifications.
+- After unregistering, the user will not receive any push notifications until they register a new device token.
+- This helps maintain user privacy and reduces unnecessary notification attempts.
+
+#### Example Request (cURL)
+
+```bash path=null start=null
+curl -X POST "https://your-api-url.com/api/user-notifications/unregister-device/3fa85f64-5717-4562-b3fc-2c963f66afa6" \
+  -H "Content-Type: application/json"
+```
+
+---
+
+## Automated Payment Reminders
+
+Payment reminders are not exposed as a public REST API. Instead, they are executed by a scheduled background job using Hangfire.
+
+### Background Job: `SendRemindersJob`
+
+- **Location**: `src/AICalendar.Application/BackgroundJobs/SendRemindersJob.cs`
+- **Purpose**: Sends push notifications for upcoming and overdue payment-related calendar items.
+- **Schedule**: Runs every hour (configured via Hangfire in infrastructure layer).
+
+### Processing Flow
+
+1. **Fetch unpaid items**
+   - Calls `ICalendarRepository.GetUnpaidItemsWithDueDatesAsync()`.
+   - Returns a collection of tuples `(item, userId)` where:
+     - `item` has a `DueDate`, `Merchant`, `Amount`, and `Id`.
+2. **Check time windows** relative to `item.DueDate` (UTC):
+   - **24 hours before due**: `now >= dueDate - 24h` and `< dueDate - 23h`
+   - **6 hours before due**: `now >= dueDate - 6h` and `< dueDate - 5h`
+   - **1 hour before due**: `now >= dueDate - 1h` and `< dueDate`
+   - **12 hours overdue**: `now >= dueDate + 12h` and `< dueDate + 13h`
+   - **24 hours overdue**: `now >= dueDate + 24h` and `< dueDate + 25h`
+   - **48 hours overdue**: `now >= dueDate + 48h` and `< dueDate + 49h`
+3. **Build notification message** depending on the window:
+   - Upcoming examples:
+     - `"Payment Due Soon: {Merchant} - ${Amount} due in 24 hours ({DueDate} UTC)"`
+     - `"Payment Due Soon: {Merchant} - ${Amount} due in 6 hours ({DueDate} UTC)"`
+     - `"Payment Due Soon: {Merchant} - ${Amount} due in 1 hour ({DueDate} UTC)"`
+   - Overdue examples:
+     - `"Payment Overdue: {Merchant} - ${Amount} was due 12 hours ago"`
+     - `"Payment Overdue: {Merchant} - ${Amount} was due 24 hours ago"`
+     - `"Payment Overdue: {Merchant} - ${Amount} was due 48 hours ago"`
+4. **Send push notification** via `INotificationService.SendPushNotificationAsync`:
+   - **Title**: `"AICalendar Payment Reminder"`
+   - **Body**: The computed `notificationMessage`.
+   - **Data payload**:
+     - `calendarItemId`: the calendar item ID
+     - `type`: `"payment_reminder"`
+     - `merchant`: merchant name
+     - `amount`: amount formatted as string
+     - `dueDate`: ISO 8601 (`"O"`) representation of due date
+5. **Logging**
+   - Logs start/end of processing.
+   - Logs each sent notification with item and user IDs.
+
+### Integration with User Notifications
+
+- The reminder job relies on the **same FCM infrastructure** as other push notifications.
+- To receive payment reminders, a user must:
+  1. Have a valid FCM token registered via `POST /api/user-notifications/register-device`.
+  2. Keep notifications enabled on their device.
+
+There is currently **no public REST endpoint** to create or manage reminder schedules directly; they are derived from calendar items with unpaid status and due dates.
+
+---
+
+## Error Handling
+
+User notification endpoints follow a simple, consistent error model:
+
+```json path=null start=null
+{
+  "message": "Description of the error"
+}
+```
+
+Typical scenarios:
+
+1. **Validation Errors (400)**
+   - Invalid `userId` format.
+   - Missing or malformed `fcmToken`.
+2. **Not Found (404)**
+   - User does not exist in the database.
+3. **Conflict (409)**
+   - User already has a registered device token (if the command enforces single-device rules).
+4. **Server Errors (500)**
+   - Unexpected exceptions during processing or when calling notification providers.
+
+---
+
+## Authentication & Authorization
+
+Currently, these endpoints do **not** require authentication headers.
+If authentication is added in the future, clients will likely need to include:
+
+```text
+Authorization: Bearer {your-jwt-token}
+```
+
+Check with your system administrator or API gateway configuration for the most up-to-date requirements.
+
+---
+
+## Related Documentation
+
+- `docs/api/Users-API-Guide.md`
+- `docs/FIREBASE_NOTIFICATION_IMPLEMENTATION.md`
+- `docs/TESTING_FIREBASE_NOTIFICATIONS.md`
+- `docs/PUSH_NOTIFICATION_USER_GUIDE.md`
+- `docs/BackgroundJobs.md` (for Hangfire and scheduled jobs)

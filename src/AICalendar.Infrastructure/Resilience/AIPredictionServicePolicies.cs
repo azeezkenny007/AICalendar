@@ -127,33 +127,42 @@ public static class AIPredictionServicePolicies
         ILogger logger,
         ResilienceOptions options)
     {
-        // Create a static fallback response to avoid creating new instances
-        var fallbackResponse = new HttpResponseMessage(System.Net.HttpStatusCode.OK)
-        {
-            Content = new StringContent(
-                System.Text.Json.JsonSerializer.Serialize(new
-                {
-                    status = "fallback",
-                    message = "AI service unavailable. Please try again later.",
-                    predictions = Array.Empty<object>(),
-                    metadata = new
-                    {
-                        total_predictions = 0,
-                        confidence_score = 0.0,
-                        model_version = "fallback",
-                        processing_time_ms = 0
-                    }
-                }),
-                System.Text.Encoding.UTF8,
-                "application/json")
-        };
-
         return HttpPolicyExtensions
             .HandleTransientHttpError()
             .Or<BrokenCircuitException>()
             .Or<TimeoutRejectedException>()
             .FallbackAsync(
-                fallbackValue: fallbackResponse,
+                fallbackAction: (outcome, context, cancellationToken) =>
+                {
+                    // Determine the real reason for failure
+                    var realReason = outcome.Exception?.Message
+                        ?? (outcome.Result != null
+                            ? $"HTTP {outcome.Result.StatusCode}"
+                            : "Unknown Error");
+
+                    // Create a dynamic, informative fallback response
+                    var fallbackResponse = new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+                    {
+                        Content = new StringContent(
+                            System.Text.Json.JsonSerializer.Serialize(new
+                            {
+                                status = "fallback",
+                                // Embed the real reason here so it propagates to the logs/DB
+                                error_message = $"AI service unavailable: {realReason}",
+                                predictions = Array.Empty<object>(),
+                                metadata = new
+                                {
+                                    total_predictions = 0,
+                                    confidence_score = 0.0,
+                                    model_version = "fallback",
+                                    processing_time_ms = 0
+                                }
+                            }),
+                            System.Text.Encoding.UTF8,
+                            "application/json")
+                    };
+                    return Task.FromResult(fallbackResponse);
+                },
                 onFallbackAsync: (outcome, context) =>
                 {
                     logger.LogWarning(

@@ -10,13 +10,13 @@ namespace AICalendar.API.Controllers;
 /// Manages user device registration and push notification settings
 /// </summary>
 [ApiController]
-[Route("api/user-notifications")]
+[Route("api/push-notifications")]
 [Produces("application/json")]
-public class UserNotificationsController : ControllerBase
+public class PushNotificationsController : ControllerBase
 {
     private readonly IMediator _mediator;
 
-    public UserNotificationsController(IMediator mediator)
+    public PushNotificationsController(IMediator mediator)
     {
         _mediator = mediator;
     }

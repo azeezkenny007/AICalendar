@@ -1,0 +1,137 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "type": "graph",
+      "title": "HTTP Requests Total",
+      "targets": [
+        {
+          "expr": "http_requests_total",
+          "legendFormat": "{{method}} {{endpoint}}",
+          "refId": "A"
+        }
+      ],
+      "id": 1,
+      "gridPos": {"x":0,"y":0,"w":12,"h":6}
+    },
+    {
+      "type": "graph",
+      "title": "HTTP Requests per Second",
+      "targets": [
+        {
+          "expr": "rate(http_requests_total[1m])",
+          "legendFormat": "{{method}} {{endpoint}}",
+          "refId": "B"
+        }
+      ],
+      "id": 2,
+      "gridPos": {"x":12,"y":0,"w":12,"h":6}
+    },
+    {
+      "type": "graph",
+      "title": "HTTP Request Duration P50",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket[1m])) by (le, endpoint))",
+          "legendFormat": "{{endpoint}}",
+          "refId": "C"
+        }
+      ],
+      "id": 3,
+      "gridPos": {"x":0,"y":6,"w":12,"h":6}
+    },
+    {
+      "type": "graph",
+      "title": "HTTP 5xx Error Rate",
+      "targets": [
+        {
+          "expr": "rate(http_requests_total{status=~\"5..\"}[1m])",
+          "legendFormat": "{{endpoint}}",
+          "refId": "D"
+        }
+      ],
+      "id": 4,
+      "gridPos": {"x":12,"y":6,"w":12,"h":6}
+    },
+    {
+      "type": "graph",
+      "title": "Redis Commands Processed per Second",
+      "targets": [
+        {
+          "expr": "rate(redis_commands_processed_total[1m])",
+          "legendFormat": "{{instance}}",
+          "refId": "E"
+        }
+      ],
+      "id": 5,
+      "gridPos": {"x":0,"y":12,"w":12,"h":6}
+    },
+    {
+      "type": "graph",
+      "title": "Redis Memory Used (bytes)",
+      "targets": [
+        {
+          "expr": "redis_memory_used_bytes",
+          "legendFormat": "{{instance}}",
+          "refId": "F"
+        }
+      ],
+      "id": 6,
+      "gridPos": {"x":12,"y":12,"w":12,"h":6}
+    },
+    {
+      "type": "graph",
+      "title": "Redis Keyspace Hits & Misses",
+      "targets": [
+        {
+          "expr": "rate(redis_keyspace_hits_total[1m])",
+          "legendFormat": "Hits",
+          "refId": "G"
+        },
+        {
+          "expr": "rate(redis_keyspace_misses_total[1m])",
+          "legendFormat": "Misses",
+          "refId": "H"
+        }
+      ],
+      "id": 7,
+      "gridPos": {"x":0,"y":18,"w":24,"h":6}
+    },
+    {
+      "type": "graph",
+      "title": "SQL Server Queries per Second",
+      "targets": [
+        {
+          "expr": "rate(mssql_queries_total[1m])",
+          "legendFormat": "{{instance}}",
+          "refId": "I"
+        }
+      ],
+      "id": 8,
+      "gridPos": {"x":0,"y":24,"w":12,"h":6}
+    },
+    {
+      "type": "graph",
+      "title": "SQL Server Connections & Memory",
+      "targets": [
+        {
+          "expr": "mssql_connections",
+          "legendFormat": "Connections",
+          "refId": "J"
+        },
+        {
+          "expr": "mssql_memory_used_bytes",
+          "legendFormat": "Memory Used",
+          "refId": "K"
+        }
+      ],
+      "id": 9,
+      "gridPos": {"x":12,"y":24,"w":12,"h":6}
+    }
+  ],
+  "schemaVersion": 38,
+  "title": "ASP.NET + Redis + SQL Metrics",
+  "version": 1
+}

@@ -1,0 +1,130 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": "-- Grafana --",
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "row",
+      "title": "API Metrics",
+      "collapsed": false,
+      "panels": []
+    },
+    {
+      "type": "graph",
+      "title": "Total Requests",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "http_requests_total",
+          "legendFormat": "{{method}} {{endpoint}}",
+          "refId": "A"
+        }
+      ],
+      "gridPos": {"x":0,"y":0,"w":12,"h":8}
+    },
+    {
+      "type": "graph",
+      "title": "Requests per Second",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "rate(http_requests_total[1m])",
+          "legendFormat": "{{method}} {{endpoint}}",
+          "refId": "B"
+        }
+      ],
+      "gridPos": {"x":12,"y":0,"w":12,"h":8}
+    },
+    {
+      "type": "graph",
+      "title": "Request Duration (P50/P90/P95/P99)",
+      "datasource": "Prometheus",
+      "targets": [
+        {"expr":"histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket[1m])) by (le, endpoint))","legendFormat":"P50","refId":"C"},
+        {"expr":"histogram_quantile(0.90, sum(rate(http_request_duration_seconds_bucket[1m])) by (le, endpoint))","legendFormat":"P90","refId":"D"},
+        {"expr":"histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[1m])) by (le, endpoint))","legendFormat":"P95","refId":"E"},
+        {"expr":"histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[1m])) by (le, endpoint))","legendFormat":"P99","refId":"F"}
+      ],
+      "gridPos":{"x":0,"y":8,"w":24,"h":8}
+    },
+    {
+      "type": "graph",
+      "title": "Error Rate",
+      "datasource": "Prometheus",
+      "targets":[
+        {"expr":"rate(http_requests_total{status=~\"5..\"}[1m])","legendFormat":"5xx Errors","refId":"G"}
+      ],
+      "gridPos":{"x":0,"y":16,"w":24,"h":6}
+    },
+    {
+      "type": "row",
+      "title": "Redis Metrics",
+      "collapsed": false,
+      "panels":[]
+    },
+    {
+      "type": "graph",
+      "title": "Redis Memory Usage",
+      "datasource": "Prometheus",
+      "targets":[{"expr":"redis_memory_used_bytes","legendFormat":"Memory Used","refId":"H"}],
+      "gridPos":{"x":0,"y":22,"w":12,"h":6}
+    },
+    {
+      "type": "graph",
+      "title": "Redis Commands per Second",
+      "datasource": "Prometheus",
+      "targets":[{"expr":"rate(redis_commands_processed_total[1m])","legendFormat":"Commands/s","refId":"I"}],
+      "gridPos":{"x":12,"y":22,"w":12,"h":6}
+    },
+    {
+      "type": "graph",
+      "title": "Redis Hits vs Misses",
+      "datasource": "Prometheus",
+      "targets":[
+        {"expr":"rate(redis_keyspace_hits_total[1m])","legendFormat":"Hits","refId":"J"},
+        {"expr":"rate(redis_keyspace_misses_total[1m])","legendFormat":"Misses","refId":"K"}
+      ],
+      "gridPos":{"x":0,"y":28,"w":24,"h":6}
+    },
+    {
+      "type": "row",
+      "title": "SQL Server Metrics",
+      "collapsed": false,
+      "panels":[]
+    },
+    {
+      "type": "graph",
+      "title": "SQL Connections",
+      "datasource": "Prometheus",
+      "targets":[{"expr":"mssql_connections","legendFormat":"Connections","refId":"L"}],
+      "gridPos":{"x":0,"y":34,"w":12,"h":6}
+    },
+    {
+      "type": "graph",
+      "title": "SQL Queries per Second",
+      "datasource": "Prometheus",
+      "targets":[{"expr":"rate(mssql_queries_total[1m])","legendFormat":"QPS","refId":"M"}],
+      "gridPos":{"x":12,"y":34,"w":12,"h":6}
+    },
+    {
+      "type": "graph",
+      "title": "SQL Memory Usage",
+      "datasource": "Prometheus",
+      "targets":[{"expr":"mssql_memory_used_bytes","legendFormat":"Memory Used","refId":"N"}],
+      "gridPos":{"x":0,"y":40,"w":24,"h":6}
+    }
+  ],
+  "schemaVersion": 36,
+  "title": "ASP.NET Core + Redis + SQL Server Metrics",
+  "version": 1
+}

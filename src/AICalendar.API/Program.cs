@@ -16,6 +16,7 @@ using AICalendar.Application.BackgroundJobs;
 using FirebaseAdmin;
 using Google.Apis.Auth.OAuth2;
 using Microsoft.Extensions.Options;
+using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -225,6 +226,10 @@ app.UseAuthorization();
 
 // Configure Hangfire Dashboard
 app.UseHangfireDashboardWithAuth();
+
+// Add Prometheus metrics middleware
+app.UseMetricServer();
+app.UseHttpMetrics();
 
 app.MapControllers();
 

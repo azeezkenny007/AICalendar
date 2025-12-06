@@ -45,6 +45,8 @@ builder.Services.AddSwaggerGen(c =>
 ## Features
 - **Predictions**: AI-generated payment predictions from transaction history
 - **Calendar**: Manage scheduled payments with due dates and tracking
+- **Feedback**: User feedback collection and management system
+- **Push Notifications**: Firebase Cloud Messaging for device notifications
 - **Health Monitoring**: Comprehensive health checks for all infrastructure components
 
 ## Caching

@@ -5,6 +5,7 @@ using StackExchange.Redis;
 using AICalendar.Infrastructure.Data;
 using AICalendar.Domain.Interfaces;
 using System.Diagnostics;
+using System.Net.Http;
 using Hangfire;
 using Hangfire.Storage;
 
@@ -79,6 +80,8 @@ public class HealthController : ControllerBase
     /// - Redis cache connectivity (if configured)
     /// - API internal services and DI container
     /// - Hangfire background job server
+    /// - Prometheus metrics collection service
+    /// - Grafana monitoring dashboard service
     ///
     /// Use this for monitoring dashboards and alerting systems.
     /// </remarks>
@@ -91,6 +94,8 @@ public class HealthController : ControllerBase
         var redisStatus = await CheckRedis();
         var apiStatus = CheckApi(); // Synchronous check - no async operations needed
         var hangfireStatus = CheckHangfire();
+        var prometheusStatus = await CheckPrometheus();
+        var grafanaStatus = await CheckGrafana();
 
         var health = new
         {
@@ -101,14 +106,18 @@ public class HealthController : ControllerBase
                 database = databaseStatus,
                 redis = redisStatus,
                 apihealth = apiStatus,
-                hangfire = hangfireStatus
+                hangfire = hangfireStatus,
+                prometheus = prometheusStatus,
+                grafana = grafanaStatus
             }
         };
 
         var allHealthy = health.checks.database == "healthy"
                       && (health.checks.redis == "healthy" || health.checks.redis == "not_configured")
                       && health.checks.apihealth == "healthy"
-                      && health.checks.hangfire == "healthy";
+                      && health.checks.hangfire == "healthy"
+                      && health.checks.prometheus == "healthy"
+                      && health.checks.grafana == "healthy";
 
         return allHealthy
             ? Ok(health)
@@ -304,6 +313,80 @@ public class HealthController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Hangfire health check failed: {Exception}", ex.Message);
+            return "unhealthy";
+        }
+    }
+
+    /// <summary>
+    /// Checks if Prometheus is functioning properly by verifying:
+    /// 1. Prometheus service is accessible via HTTP
+    /// 2. Can retrieve basic metrics endpoint
+    /// </summary>
+    private async Task<string> CheckPrometheus()
+    {
+        try
+        {
+            using var client = new HttpClient();
+            client.Timeout = TimeSpan.FromSeconds(10);
+
+            // Try to access Prometheus health endpoint
+            var response = await client.GetAsync("http://prometheus:9090/-/ready");
+
+            if (response.IsSuccessStatusCode)
+            {
+                return "healthy";
+            }
+            else
+            {
+                _logger.LogWarning("Prometheus health check returned status code: {StatusCode}", response.StatusCode);
+                return "unhealthy";
+            }
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning(ex, "Prometheus health check failed - service may not be running");
+            return "unhealthy";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Prometheus health check failed with exception: {Exception}", ex.Message);
+            return "unhealthy";
+        }
+    }
+
+    /// <summary>
+    /// Checks if Grafana is functioning properly by verifying:
+    /// 1. Grafana service is accessible via HTTP
+    /// 2. Can access the health endpoint
+    /// </summary>
+    private async Task<string> CheckGrafana()
+    {
+        try
+        {
+            using var client = new HttpClient();
+            client.Timeout = TimeSpan.FromSeconds(10);
+
+            // Try to access Grafana health endpoint
+            var response = await client.GetAsync("http://grafana:3000/api/health");
+
+            if (response.IsSuccessStatusCode)
+            {
+                return "healthy";
+            }
+            else
+            {
+                _logger.LogWarning("Grafana health check returned status code: {StatusCode}", response.StatusCode);
+                return "unhealthy";
+            }
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning(ex, "Grafana health check failed - service may not be running");
+            return "unhealthy";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Grafana health check failed with exception: {Exception}", ex.Message);
             return "unhealthy";
         }
     }

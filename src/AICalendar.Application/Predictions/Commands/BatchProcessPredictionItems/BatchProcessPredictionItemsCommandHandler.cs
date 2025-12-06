@@ -75,6 +75,7 @@ public class BatchProcessPredictionItemsCommandHandler
             else
             {
                 _logger.LogWarning("Prediction not found for item {ItemId}", itemId);
+                return Result.Failure($"Prediction item {itemId} not found.");
             }
         }
 

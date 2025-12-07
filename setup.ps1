@@ -87,21 +87,42 @@ ASPNETCORE_ENVIRONMENT=Development
     # Generate random passwords
     $mssqlPwd = Generate-Password -Prefix "Strong@" -Length 12
     $redisPwd = Generate-Password -Prefix "Redis@" -Length 16
+    $seqPwd = Generate-Password -Prefix "Seq@" -Length 16
 
     # Update .env with generated passwords
     $envContent = Get-Content .env -Raw
     $envContent = $envContent -replace 'YourStrong@Passw0rd', $mssqlPwd
     $envContent = $envContent -replace 'YourRedis@Passw0rd', $redisPwd
+
+    if ($envContent -notmatch '(?m)^\s*SEQ_ADMIN_PASSWORD=') {
+        $envContent += "`n# Seq admin password (for Seq admin UI)`nSEQ_ADMIN_PASSWORD=$seqPwd`n"
+    }
+
     $envContent | Out-File -FilePath .env -Encoding UTF8 -NoNewline
 
     Write-Host "Created .env file with generated passwords" -ForegroundColor Green
     Write-Host "SQL Server password: $mssqlPwd" -ForegroundColor Cyan
     Write-Host "Redis password: $redisPwd" -ForegroundColor Cyan
+    Write-Host "(Seq admin password stored in .env as SEQ_ADMIN_PASSWORD)" -ForegroundColor DarkGray
     Write-Host ""
     Write-Host "Passwords are saved in .env file (gitignored)" -ForegroundColor Yellow
     Write-Host ""
 } else {
     Write-Host ".env file already exists" -ForegroundColor Green
+
+    # Ensure Seq admin password exists without overwriting if already set
+    $envContent = Get-Content .env -Raw
+    if ($envContent -notmatch '(?m)^\s*SEQ_ADMIN_PASSWORD=') {
+        $seqPwd = Generate-Password -Prefix "Seq@" -Length 16
+        $envContent += "`n# Seq admin password (for Seq admin UI)`nSEQ_ADMIN_PASSWORD=$seqPwd`n"
+        $envContent | Out-File -FilePath .env -Encoding UTF8 -NoNewline
+
+        Write-Host "Generated Seq admin password and added to .env" -ForegroundColor Yellow
+        Write-Host "(Seq admin password stored in .env as SEQ_ADMIN_PASSWORD)" -ForegroundColor DarkGray
+    } else {
+        Write-Host "SEQ_ADMIN_PASSWORD already set in .env; leaving it unchanged" -ForegroundColor Yellow
+    }
+
     Write-Host ""
 }
 

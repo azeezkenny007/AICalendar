@@ -1,10 +1,10 @@
 using FluentValidation;
 
-namespace AICalendar.Application.Users.Commands.TestNotification;
+namespace AICalendar.Application.PushNotifications.Commands.UnregisterDevice;
 
-public class TestNotificationCommandValidator : AbstractValidator<TestNotificationCommand>
+public class UnregisterDeviceCommandValidator : AbstractValidator<UnregisterDeviceCommand>
 {
-    public TestNotificationCommandValidator()
+    public UnregisterDeviceCommandValidator()
     {
         RuleFor(x => x.UserId)
             .NotEmpty()

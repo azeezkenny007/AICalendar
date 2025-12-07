@@ -1,6 +1,6 @@
 using FluentValidation;
 
-namespace AICalendar.Application.Users.Commands.RegisterDevice;
+namespace AICalendar.Application.PushNotifications.Commands.RegisterDevice;
 
 public class RegisterDeviceCommandValidator : AbstractValidator<RegisterDeviceCommand>
 {

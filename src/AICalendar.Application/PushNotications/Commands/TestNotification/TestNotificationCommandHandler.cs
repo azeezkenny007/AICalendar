@@ -5,7 +5,7 @@ using AICalendar.Domain.ValueObjects;
 using MediatR;
 using Microsoft.Extensions.Logging;
 
-namespace AICalendar.Application.Users.Commands.TestNotification;
+namespace AICalendar.Application.PushNotifications.Commands.TestNotification;
 
 public class TestNotificationCommandHandler : IRequestHandler<TestNotificationCommand, OperationResult>
 {

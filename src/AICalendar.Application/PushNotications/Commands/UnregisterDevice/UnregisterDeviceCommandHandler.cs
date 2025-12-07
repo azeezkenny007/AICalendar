@@ -5,7 +5,7 @@ using AICalendar.Domain.ValueObjects;
 using MediatR;
 using Microsoft.Extensions.Logging;
 
-namespace AICalendar.Application.Users.Commands.UnregisterDevice;
+namespace AICalendar.Application.PushNotifications.Commands.UnregisterDevice;
 
 public class UnregisterDeviceCommandHandler : IRequestHandler<UnregisterDeviceCommand, OperationResult>
 {

@@ -5,7 +5,7 @@ using AICalendar.Domain.ValueObjects;
 using MediatR;
 using Microsoft.Extensions.Logging;
 
-namespace AICalendar.Application.Users.Commands.RegisterDevice;
+namespace AICalendar.Application.PushNotifications.Commands.RegisterDevice;
 
 public class RegisterDeviceCommandHandler : IRequestHandler<RegisterDeviceCommand, OperationResult>
 {

@@ -1,7 +1,7 @@
 using AICalendar.Application.Common.Models;
 using MediatR;
 
-namespace AICalendar.Application.Users.Commands.RegisterDevice;
+namespace AICalendar.Application.PushNotifications.Commands.RegisterDevice;
 
 public record RegisterDeviceCommand(
     Guid UserId,

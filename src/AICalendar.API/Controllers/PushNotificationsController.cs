@@ -1,6 +1,6 @@
-using AICalendar.Application.Users.Commands.RegisterDevice;
-using AICalendar.Application.Users.Commands.TestNotification;
-using AICalendar.Application.Users.Commands.UnregisterDevice;
+using AICalendar.Application.PushNotifications.Commands.RegisterDevice;
+using AICalendar.Application.PushNotifications.Commands.TestNotification;
+using AICalendar.Application.PushNotifications.Commands.UnregisterDevice;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 

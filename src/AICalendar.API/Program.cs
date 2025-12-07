@@ -17,8 +17,16 @@ using FirebaseAdmin;
 using Google.Apis.Auth.OAuth2;
 using Microsoft.Extensions.Options;
 using Prometheus;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Configure Serilog
+Log.Logger = new LoggerConfiguration()
+    .ReadFrom.Configuration(builder.Configuration)
+    .CreateLogger();
+
+builder.Host.UseSerilog();
 
 // Add services to the container.
 builder.Services.AddControllers();
@@ -157,11 +165,11 @@ if (File.Exists(firebaseCredentialsPath))
 
     builder.Services.AddScoped<INotificationService, FirebaseNotificationService>();
 
-    Console.WriteLine("✅ Firebase Cloud Messaging initialized");
+    Log.Information("✅ Firebase Cloud Messaging initialized");
 }
 else
 {
-    Console.WriteLine("⚠️  WARNING: firebase-credentials.json not found. Notifications disabled.");
+    Log.Warning("⚠️  WARNING: firebase-credentials.json not found. Notifications disabled.");
 
     // Register a null/dummy service for development
     builder.Services.AddScoped<INotificationService, NullNotificationService>();
@@ -215,6 +223,9 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.UseRouting();
+
+// Log all HTTP requests through Serilog
+app.UseSerilogRequestLogging();
 
 if (!app.Environment.IsDevelopment())
 {

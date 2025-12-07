@@ -82,6 +82,7 @@ public class HealthController : ControllerBase
     /// - Hangfire background job server
     /// - Prometheus metrics collection service
     /// - Grafana monitoring dashboard service
+    /// - Seq structured logging server
     ///
     /// Use this for monitoring dashboards and alerting systems.
     /// </remarks>
@@ -96,6 +97,7 @@ public class HealthController : ControllerBase
         var hangfireStatus = CheckHangfire();
         var prometheusStatus = await CheckPrometheus();
         var grafanaStatus = await CheckGrafana();
+        var seqStatus = await CheckSeq();
 
         var health = new
         {
@@ -108,7 +110,8 @@ public class HealthController : ControllerBase
                 apihealth = apiStatus,
                 hangfire = hangfireStatus,
                 prometheus = prometheusStatus,
-                grafana = grafanaStatus
+                grafana = grafanaStatus,
+                seq = seqStatus
             }
         };
 
@@ -117,7 +120,8 @@ public class HealthController : ControllerBase
                       && health.checks.apihealth == "healthy"
                       && health.checks.hangfire == "healthy"
                       && health.checks.prometheus == "healthy"
-                      && health.checks.grafana == "healthy";
+                      && health.checks.grafana == "healthy"
+                      && health.checks.seq == "healthy";
 
         return allHealthy
             ? Ok(health)
@@ -387,6 +391,43 @@ public class HealthController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Grafana health check failed with exception: {Exception}", ex.Message);
+            return "unhealthy";
+        }
+    }
+
+    /// <summary>
+    /// Checks if Seq is functioning properly by verifying:
+    /// 1. Seq service is accessible via HTTP
+    /// 2. Can load the root UI page (Seq does not expose a simple /health endpoint by default)
+    /// </summary>
+    private async Task<string> CheckSeq()
+    {
+        try
+        {
+            using var client = new HttpClient();
+            client.Timeout = TimeSpan.FromSeconds(10);
+
+            // Try to access Seq root UI via Docker service name (container listens on port 80)
+            var response = await client.GetAsync("http://seq/");
+
+            if (response.IsSuccessStatusCode)
+            {
+                return "healthy";
+            }
+            else
+            {
+                _logger.LogWarning("Seq health check returned status code: {StatusCode}", response.StatusCode);
+                return "unhealthy";
+            }
+        }
+        catch (HttpRequestException ex)
+        {
+            _logger.LogWarning(ex, "Seq health check failed - service may not be running");
+            return "unhealthy";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Seq health check failed with exception: {Exception}", ex.Message);
             return "unhealthy";
         }
     }

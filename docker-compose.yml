@@ -58,6 +58,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      seq:
+        condition: service_healthy
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8080/health" ]
       interval: 30s
@@ -171,6 +173,29 @@ services:
       - aicalendar-network
 
   # ============================================================================
+  # Seq - Structured Logging
+  # ============================================================================
+  seq:
+    image: datalust/seq:latest
+    container_name: aicalendar-seq
+    ports:
+      - "5341:80"
+    environment:
+      - ACCEPT_EULA=Y
+      - SEQ_FIRSTRUN_ADMINPASSWORD=${SEQ_ADMIN_PASSWORD:-Admin123!}
+    volumes:
+      - seq_data:/data
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:80" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - aicalendar-network
+
+  # ============================================================================
   # Node Exporter - Infrastructure Monitoring
   # ============================================================================
   node-exporter:
@@ -228,6 +253,10 @@ volumes:
   # Grafana data
   grafana_data:
     name: aicalendar_grafana_data
+
+  # Seq data
+  seq_data:
+    name: aicalendar_seq_data
 
 # ============================================================================
 # Networks

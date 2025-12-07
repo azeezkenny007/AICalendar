@@ -10,16 +10,26 @@ public class GetUserPredictionsQueryHandler
     : IRequestHandler<GetUserPredictionsQuery, Result<List<PredictionDto>>>
 {
     private readonly IApplicationDbContext _context;
+    private readonly IUserRepository _userRepository;
 
-    public GetUserPredictionsQueryHandler(IApplicationDbContext context)
+    public GetUserPredictionsQueryHandler(
+        IApplicationDbContext context,
+        IUserRepository userRepository)
     {
         _context = context;
+        _userRepository = userRepository;
     }
 
     public async Task<Result<List<PredictionDto>>> Handle(
         GetUserPredictionsQuery request,
         CancellationToken cancellationToken)
     {
+        var user = await _userRepository.GetByIdAsync(request.UserId, cancellationToken);
+        if (user == null)
+        {
+            return Result<List<PredictionDto>>.Failure($"User {request.UserId} not found.");
+        }
+
         var predictions = await _context.Predictions
             .Where(p => p.UserId == request.UserId)
             .OrderByDescending(p => p.CreatedAt)

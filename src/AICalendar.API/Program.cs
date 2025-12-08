@@ -18,6 +18,8 @@ using Google.Apis.Auth.OAuth2;
 using Microsoft.Extensions.Options;
 using Prometheus;
 using Serilog;
+using Microsoft.AspNetCore.ResponseCompression;
+using System.IO.Compression;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -31,6 +33,19 @@ builder.Host.UseSerilog();
 // Add services to the container.
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+
+// Add response compression services
+builder.Services.AddResponseCompression(options =>
+{
+    options.EnableForHttps = true;                     // Very important in 2024+
+    options.Providers.Add<BrotliCompressionProvider>();
+    options.Providers.Add<GzipCompressionProvider>();
+    // options.Providers.Add<ZstdCompressionProvider>(); // .NET 9+ if you want Zstandard
+
+    // Optional: configure compression level
+    options.Providers.Add(new BrotliCompressionProvider(
+        new BrotliCompressionProviderOptions { Level = CompressionLevel.Fastest }));
+});
 
 builder.Services.AddCors(options =>
 {
@@ -86,6 +101,9 @@ builder.Services.AddDbContext<ApplicationDbContext>((serviceProvider, options) =
     var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 
     options.UseSqlServer(connectionString);
+
+    // Set global query tracking behavior to NoTracking
+    options.UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking);
 
     // Add OutboxInterceptor for automatic domain event conversion
     var outboxInterceptor = serviceProvider.GetRequiredService<AICalendar.Infrastructure.Persistence.Interceptors.OutboxInterceptor>();
@@ -179,6 +197,9 @@ else
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
+
+// IMPORTANT: This middleware must be one of the FIRST
+app.UseResponseCompression();
 
 // Add global exception handling middleware (must be first in pipeline)
 app.UseMiddleware<ExceptionHandlingMiddleware>();

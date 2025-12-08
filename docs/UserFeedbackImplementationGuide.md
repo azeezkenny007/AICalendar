@@ -527,8 +527,8 @@ public class GetUserFeedbackStatsQueryHandler : IRequestHandler<GetUserFeedbackS
         }
 
         var total = feedbacks.Count;
-        var positive = feedbacks.Count(f => f.Type == FeedbackType.Positive);
-        var negative = feedbacks.Count(f => f.Type == FeedbackType.Negative);
+        var positive = feedbacks.Count(f => f.Action == FeedbackType.Accepted);
+        var negative = feedbacks.Count(f => f.Action == FeedbackType.Rejected);
         var edited = feedbacks.Count(f => f.WasEdited);
 
         var acceptanceRate = total > 0 ? (decimal)positive / total * 100 : 0;

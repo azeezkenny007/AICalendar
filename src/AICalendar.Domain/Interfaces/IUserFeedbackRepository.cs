@@ -11,4 +11,5 @@ public interface IUserFeedbackRepository
     Task<List<UserFeedback>> GetAllAsync(CancellationToken cancellationToken = default);
     Task AddAsync(UserFeedback feedback, CancellationToken cancellationToken = default);
     Task AddRangeAsync(List<UserFeedback> feedbacks, CancellationToken cancellationToken = default);
+    Task<List<UserFeedback>> GetUnsentToAiAsync(CancellationToken cancellationToken = default);
 }

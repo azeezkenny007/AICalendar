@@ -52,4 +52,12 @@ public class UserFeedbackRepository : IUserFeedbackRepository
     {
         await _context.Set<UserFeedback>().AddRangeAsync(feedbacks, cancellationToken);
     }
+
+    public async Task<List<UserFeedback>> GetUnsentToAiAsync(CancellationToken cancellationToken = default)
+{
+    return await _context.Set<UserFeedback>()
+        .Where(f => !f.SentToAI)
+        .OrderBy(f => f.CreatedAt)
+        .ToListAsync(cancellationToken);
+}
 }

@@ -20,6 +20,8 @@ using Prometheus;
 using Serilog;
 using Microsoft.AspNetCore.ResponseCompression;
 using System.IO.Compression;
+using AICalendar.Application.Feedback.AI.Jobs;
+using AICalendar.Application.Feedback.AI;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -135,6 +137,10 @@ builder.Services.AddHttpClient<AICalendar.Application.Services.IAIPredictionServ
         var options = services.GetRequiredService<IOptions<AICalendar.Infrastructure.Resilience.ResilienceOptions>>().Value;
         return AICalendar.Infrastructure.Resilience.AIPredictionServicePolicies.GetResiliencePipeline(logger, options);
     });
+
+builder.Services.AddHttpClient<IAIFeedbackClient, AIFeedbackClient>();
+
+builder.Services.AddScoped<SendFeedbackToAIJob>();
 
 // Register UnitOfWork
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();

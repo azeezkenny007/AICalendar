@@ -37,12 +37,8 @@ public class UserFeedbackConfiguration : IEntityTypeConfiguration<UserFeedback>
                 value => PredictionItemId.Create(value))
             .IsRequired();
 
-        builder.Property(f => f.Type)
-            .HasConversion<int>()
-            .IsRequired();
-
         builder.Property(f => f.Action)
-            .HasConversion<int>()
+            .HasConversion<string>()
             .IsRequired();
 
         builder.Property(f => f.Merchant)
@@ -76,7 +72,6 @@ public class UserFeedbackConfiguration : IEntityTypeConfiguration<UserFeedback>
         // Indexes for common queries
         builder.HasIndex(f => f.UserId);
         builder.HasIndex(f => f.PredictionId);
-        builder.HasIndex(f => f.Type);
         builder.HasIndex(f => f.CreatedAt);
 
         // Ignore domain events

@@ -9,7 +9,7 @@ public record FeedbackRecordedEvent(
     UserId UserId,
     PredictionId PredictionId,
     PredictionItemId PredictionItemId,
-    FeedbackType Type,
+    FeedbackAction Action,
     bool WasEdited,
     DateTime OccurredOn
 ) : IDomainEvent;

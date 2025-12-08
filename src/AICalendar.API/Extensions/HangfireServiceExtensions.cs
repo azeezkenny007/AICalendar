@@ -16,7 +16,7 @@ public static class HangfireServiceExtensions
         // Fallback if settings are not present in "Hangfire" section, try to use DefaultConnection
         if (string.IsNullOrEmpty(hangfireSettings?.ConnectionString))
         {
-            hangfireSettings = new HangfireSettings 
+            hangfireSettings = new HangfireSettings
             {
                 ConnectionString = configuration.GetConnectionString("DefaultConnection"),
                 WorkerCount = configuration.GetValue<int>("Hangfire:WorkerCount", 20),

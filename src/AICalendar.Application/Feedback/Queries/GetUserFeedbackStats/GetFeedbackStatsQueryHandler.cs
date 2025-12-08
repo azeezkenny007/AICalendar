@@ -8,14 +8,22 @@ namespace AICalendar.Application.Feedback.Queries.GetUserFeedbackStats;
 public class GetUserFeedbackStatsQueryHandler : IRequestHandler<GetUserFeedbackStatsQuery, Result<FeedbackStatsDto>>
 {
     private readonly IUserFeedbackRepository _feedbackRepository;
+    private readonly IUserRepository _userRepository;
 
-    public GetUserFeedbackStatsQueryHandler(IUserFeedbackRepository feedbackRepository)
+    public GetUserFeedbackStatsQueryHandler(IUserFeedbackRepository feedbackRepository, IUserRepository userRepository)
     {
         _feedbackRepository = feedbackRepository;
+        _userRepository = userRepository;
     }
 
     public async Task<Result<FeedbackStatsDto>> Handle(GetUserFeedbackStatsQuery request, CancellationToken cancellationToken)
     {
+        var user = await _userRepository.GetByIdAsync(request.UserId, cancellationToken);
+        if (user == null)
+        {
+            return Result<FeedbackStatsDto>.Failure($"User with ID {request.UserId} not found.");
+        }
+        
         var feedbacks = await _feedbackRepository.GetByUserIdAsync(request.UserId, cancellationToken);
 
         if (!feedbacks.Any())

@@ -67,6 +67,12 @@ public class UserFeedbackConfiguration : IEntityTypeConfiguration<UserFeedback>
         builder.Property(f => f.CreatedAt)
             .IsRequired();
 
+        builder.Property(f => f.SentToAI)
+            .IsRequired()
+            .HasDefaultValue(false);
+
+        builder.Property(f => f.SentToAIAt);
+
         // Indexes for common queries
         builder.HasIndex(f => f.UserId);
         builder.HasIndex(f => f.PredictionId);

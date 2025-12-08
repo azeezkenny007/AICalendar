@@ -28,6 +28,9 @@ public class UserFeedback : AggregateRoot<UserFeedbackId>
 
     public DateTime CreatedAt { get; private set; }
 
+    public bool SentToAI { get; private set; } 
+    public DateTime? SentToAIAt { get; private set; }
+
     // EF Core
     private UserFeedback() { }
 
@@ -59,6 +62,11 @@ public class UserFeedback : AggregateRoot<UserFeedbackId>
         CreatedAt = DateTime.UtcNow;
     }
 
+    public void MarkAsSentToAI()
+    {
+        SentToAI = true;
+        SentToAIAt = DateTime.UtcNow;
+    }   
     /// <summary>
     /// Creates positive feedback when user accepts a prediction
     /// </summary>

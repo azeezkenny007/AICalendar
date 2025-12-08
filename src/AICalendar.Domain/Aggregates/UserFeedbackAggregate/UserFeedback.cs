@@ -13,7 +13,6 @@ public class UserFeedback : AggregateRoot<UserFeedbackId>
     public PredictionId PredictionId { get; private set; } = default!;
     public PredictionItemId PredictionItemId { get; private set; } = default!;
 
-    public FeedbackType Type { get; private set; }
     public FeedbackAction Action { get; private set; }
 
     // Prediction details at time of feedback
@@ -28,6 +27,9 @@ public class UserFeedback : AggregateRoot<UserFeedbackId>
 
     public DateTime CreatedAt { get; private set; }
 
+    public bool SentToAI { get; private set; } 
+    public DateTime? SentToAIAt { get; private set; }
+
     // EF Core
     private UserFeedback() { }
 
@@ -35,7 +37,6 @@ public class UserFeedback : AggregateRoot<UserFeedbackId>
         UserId userId,
         PredictionId predictionId,
         PredictionItemId predictionItemId,
-        FeedbackType type,
         FeedbackAction action,
         string merchant,
         decimal amount,
@@ -48,7 +49,6 @@ public class UserFeedback : AggregateRoot<UserFeedbackId>
         UserId = userId;
         PredictionId = predictionId;
         PredictionItemId = predictionItemId;
-        Type = type;
         Action = action;
         Merchant = merchant;
         Amount = amount;
@@ -59,6 +59,11 @@ public class UserFeedback : AggregateRoot<UserFeedbackId>
         CreatedAt = DateTime.UtcNow;
     }
 
+    public void MarkAsSentToAI()
+    {
+        SentToAI = true;
+        SentToAIAt = DateTime.UtcNow;
+    }   
     /// <summary>
     /// Creates positive feedback when user accepts a prediction
     /// </summary>
@@ -77,7 +82,6 @@ public class UserFeedback : AggregateRoot<UserFeedbackId>
             userId,
             predictionId,
             predictionItemId,
-            FeedbackType.Positive,
             FeedbackAction.Accepted,
             merchant,
             amount,
@@ -92,7 +96,7 @@ public class UserFeedback : AggregateRoot<UserFeedbackId>
             userId,
             predictionId,
             predictionItemId,
-            FeedbackType.Positive,
+            FeedbackAction.Accepted,
             wasEdited,
             DateTime.UtcNow
         ));
@@ -115,7 +119,6 @@ public class UserFeedback : AggregateRoot<UserFeedbackId>
             userId,
             predictionId,
             predictionItemId,
-            FeedbackType.Negative,
             FeedbackAction.Rejected,
             merchant,
             amount,
@@ -127,7 +130,7 @@ public class UserFeedback : AggregateRoot<UserFeedbackId>
             userId,
             predictionId,
             predictionItemId,
-            FeedbackType.Negative,
+            FeedbackAction.Rejected,
             false,
             DateTime.UtcNow
         ));

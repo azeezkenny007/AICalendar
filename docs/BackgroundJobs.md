@@ -129,7 +129,7 @@ From the dashboard you can:
 ### For High-Traffic Systems:
 ```json
 {
-  "BackgroundJobs": {
+  "BackgroundJobs": { 
     "ProcessOutbox": {
       "CronExpression": "*/5 * * * * *"  // Every 5 seconds
     },

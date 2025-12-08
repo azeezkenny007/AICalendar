@@ -1,4 +1,5 @@
 using AICalendar.API.Filters;
+using AICalendar.Application.Feedback.AI.Jobs;
 using Hangfire;
 using Hangfire.Dashboard;
 
@@ -18,6 +19,14 @@ public static class HangfireDashboardExtensions
             IgnoreAntiforgeryToken = true
         });
 
+        RecurringJob.AddOrUpdate<SendFeedbackToAIJob>(
+            "send-feedback-to-ai",
+            job => job.Execute(CancellationToken.None),
+            "0 2 * * *" // 2am everyday
+
+        );
+
         return app;
     }
 }
+

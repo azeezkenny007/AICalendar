@@ -3,6 +3,7 @@ using AICalendar.Application.Predictions.Commands.CreateTestPrediction;
 using AICalendar.Application.Predictions.Commands.EditPredictionItem;
 using AICalendar.Application.Predictions.Queries.GetPrediction;
 using AICalendar.Application.Predictions.Queries.GetUserPredictions;
+using AICalendar.Application.Predictions.Queries.GetUserPredictionsByMonth;
 using AICalendar.Domain.ValueObjects;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
@@ -62,6 +63,51 @@ public class PredictionsController : ControllerBase
         var result = await _mediator.Send(query);
 
         return result.IsSuccess ? Ok(result.Value) : NotFound(result.Error);
+    }
+
+    /// <summary>
+    /// Retrieves all predictions for a specific user for a particular month
+    /// </summary>
+    /// <param name="userId">The unique identifier of the user</param>
+    /// <param name="year">The year (e.g., 2024)</param>
+    /// <param name="month">The month (1-12, where 1 = January, 11 = November)</param>
+    /// <returns>A list of predictions for the user for the specified month</returns>
+    /// <response code="200">Returns the list of predictions for the specified month</response>
+    /// <response code="400">If the year or month parameters are invalid</response>
+    /// <response code="404">If the user is not found</response>
+    /// <remarks>
+    /// Sample request:
+    ///
+    ///     GET /api/predictions/user/3fa85f64-5717-4562-b3fc-2c963f66afa6/month/2024/11
+    ///
+    /// This retrieves all predictions for November 2024 for the specified user.
+    /// Month parameter: 1 = January, 2 = February, ..., 11 = November, 12 = December
+    /// </remarks>
+    [HttpGet("user/{userId:guid}/month/{year:int}/{month:int}")]
+    [ProducesResponseType(typeof(List<PredictionDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(string), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetUserPredictionsByMonth(Guid userId, int year, int month)
+    {
+        var query = new GetUserPredictionsByMonthQuery(
+            UserId.Create(userId),
+            year,
+            month
+        );
+        var result = await _mediator.Send(query);
+
+        if (result.IsSuccess)
+        {
+            return Ok(result.Value);
+        }
+
+        // Check if it's a validation error (400) or not found (404)
+        if (result.Error.Contains("not found"))
+        {
+            return NotFound(result.Error);
+        }
+
+        return BadRequest(result.Error);
     }
 
     /// <summary>

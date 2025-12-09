@@ -25,8 +25,8 @@ services:
       - ASPNETCORE_URLS=http://+:8080
 
       # Database Connection (SQL Server)
-      - ConnectionStrings__DefaultConnection=Server=db;Database=AICalendarDb;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;
-
+      # - ConnectionStrings__DefaultConnection=Server=db;Database=AICalendarDb;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;
+      - Server=tcp:calendarapp-dev-sqlsrv.database.windows.net,1433;Initial Catalog=calendarapp-dev_db;Persist Security Info=False;User ID=sqladminuser;Password=P@ssword123!!;MultipleActiveResultSets=False;Encrypt=true;TrustServerCertificate=False;Connection Timeout=30;
       # Redis Connection
       - ConnectionStrings__RedisConnection=redis:6379,password=${REDIS_PASSWORD:-devpassword},abortConnect=false
 

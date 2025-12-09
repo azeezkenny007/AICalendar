@@ -175,19 +175,19 @@ builder.Services.AddCacheServices(builder.Configuration);
 // ═══════════════════════════════════════════════════════════
 // Firebase Cloud Messaging Configuration
 // ═══════════════════════════════════════════════════════════
-var firebaseCredentialsPath = Path.Combine(
-    builder.Environment.ContentRootPath,
-    "firebase-credentials.json"
-);
+// var firebaseCredentialsPath = Path.Combine(
+//     builder.Environment.ContentRootPath,
+//     "firebase-credentials.json"
+// );
 
 
 
-// var isDocker = Environment.GetEnvironmentVariable("RENDER") == "true" && 
-//                Directory.Exists("/etc/secrets"); // Or set RENDER_DOCKER env var manually in dashboard
+var isDocker = Environment.GetEnvironmentVariable("RENDER") == "true" && 
+               Directory.Exists("/etc/secrets"); // Or set RENDER_DOCKER env var manually in dashboard
 
-// var firebaseCredentialsPath = isDocker 
-//     ? Path.Combine("/etc/secrets", "firebase-credentials.json")
-//     : Path.Combine(builder.Environment.ContentRootPath, "firebase-credentials.json");
+var firebaseCredentialsPath = isDocker 
+    ? Path.Combine("/etc/secrets", "firebase-credentials.json")
+    : Path.Combine(builder.Environment.ContentRootPath, "firebase-credentials.json");
 
 if (File.Exists(firebaseCredentialsPath))
 {
@@ -210,31 +210,31 @@ else
 
 
 var app = builder.Build();
-// using (var scope = app.Services.CreateScope())
-// {
-//     var services = scope.ServiceProvider;
-//     var logger = services.GetRequiredService<ILogger<Program>>(); // Or your Log
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    var logger = services.GetRequiredService<ILogger<Program>>(); // Or your Log
 
-//     try
-//     {
-//         var context = services.GetRequiredService<ApplicationDbContext>();
-//         logger.LogInformation("🔄 Applying EF Core migrations...");
+    try
+    {
+        var context = services.GetRequiredService<ApplicationDbContext>();
+        logger.LogInformation("🔄 Applying EF Core migrations...");
         
-//         // This applies pending migrations or does nothing if up-to-date
-//         context.Database.Migrate(); // Async: await context.Database.MigrateAsync();
+        // This applies pending migrations or does nothing if up-to-date
+        context.Database.Migrate(); // Async: await context.Database.MigrateAsync();
 
-//         logger.LogInformation("✅ Database migrations applied successfully.");
-//     }
-//     catch (Exception ex)
-//     {
-//         logger.LogError(ex, "❌ Error during database migration!");
-//         // Don't crash the app—log and continue (or throw in dev)
-//         if (app.Environment.IsDevelopment())
-//         {
-//             throw; // Fail fast in dev
-//         }
-//     }
-// }
+        logger.LogInformation("✅ Database migrations applied successfully.");
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "❌ Error during database migration!");
+        // Don't crash the app—log and continue (or throw in dev)
+        if (app.Environment.IsDevelopment())
+        {
+            throw; // Fail fast in dev
+        }
+    }
+}
 // Configure the HTTP request pipeline.
 
 // IMPORTANT: This middleware must be one of the FIRST

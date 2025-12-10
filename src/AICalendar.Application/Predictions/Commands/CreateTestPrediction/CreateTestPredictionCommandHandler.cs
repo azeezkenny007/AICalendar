@@ -47,26 +47,33 @@ public class CreateTestPredictionCommandHandler
         var cycle = PredictionCycle.Create(startDate, endDate);
         var prediction = Prediction.Create(userId, cycle);
 
-        // Add some dummy items
-        prediction.AddItem(PredictionItem.Create(
-            Guid.NewGuid(),
-            "Netflix",
-            15.99m,
-            DateTime.UtcNow.AddDays(5),
-            "Monthly subscription detected",
-            ConfidenceScore.Create(0.95, 0.9, 0.99),
-            PatternType.FixedDateRecurring
-        ));
+        // Add 10 sample prediction items
+        var sampleItems = new[]
+        {
+            new { Merchant = "Netflix", Amount = 15.99m, Days = 5, Description = "Monthly subscription detected", Confidence = 0.95, Pattern = PatternType.FixedDateRecurring },
+            new { Merchant = "Spotify", Amount = 9.99m, Days = 10, Description = "Monthly subscription detected", Confidence = 0.90, Pattern = PatternType.FixedDateRecurring },
+            new { Merchant = "Amazon Prime", Amount = 14.99m, Days = 3, Description = "Monthly subscription detected", Confidence = 0.92, Pattern = PatternType.FixedDateRecurring },
+            new { Merchant = "Apple iCloud", Amount = 2.99m, Days = 7, Description = "Monthly subscription detected", Confidence = 0.88, Pattern = PatternType.FixedDateRecurring },
+            new { Merchant = "Microsoft 365", Amount = 9.99m, Days = 15, Description = "Monthly subscription detected", Confidence = 0.93, Pattern = PatternType.FixedDateRecurring },
+            new { Merchant = "Gym Membership", Amount = 49.99m, Days = 1, Description = "Monthly recurring payment", Confidence = 0.85, Pattern = PatternType.FixedDateRecurring },
+            new { Merchant = "Internet Bill", Amount = 79.99m, Days = 20, Description = "Monthly utility bill", Confidence = 0.97, Pattern = PatternType.FixedDateRecurring },
+            new { Merchant = "Mobile Phone", Amount = 55.00m, Days = 12, Description = "Monthly phone bill", Confidence = 0.96, Pattern = PatternType.FixedDateRecurring },
+            new { Merchant = "Hulu", Amount = 7.99m, Days = 8, Description = "Monthly subscription detected", Confidence = 0.89, Pattern = PatternType.FixedDateRecurring },
+            new { Merchant = "Disney+", Amount = 10.99m, Days = 18, Description = "Monthly subscription detected", Confidence = 0.91, Pattern = PatternType.FixedDateRecurring }
+        };
 
-        prediction.AddItem(PredictionItem.Create(
-            Guid.NewGuid(),
-            "Spotify",
-            9.99m,
-            DateTime.UtcNow.AddDays(10),
-            "Monthly subscription detected",
-            ConfidenceScore.Create(0.9, 0.85, 0.95),
-            PatternType.FixedDateRecurring
-        ));
+        foreach (var item in sampleItems)
+        {
+            prediction.AddItem(PredictionItem.Create(
+                Guid.NewGuid(),
+                item.Merchant,
+                item.Amount,
+                DateTime.UtcNow.AddDays(item.Days),
+                item.Description,
+                ConfidenceScore.Create(item.Confidence, item.Confidence - 0.05, item.Confidence + 0.04),
+                item.Pattern
+            ));
+        }
 
         prediction.MarkAsGenerated();
 

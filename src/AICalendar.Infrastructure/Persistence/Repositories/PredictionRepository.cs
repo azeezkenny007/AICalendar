@@ -53,7 +53,16 @@ public class PredictionRepository : IPredictionRepository
 
     public Task UpdateAsync(Prediction prediction, CancellationToken ct = default)
     {
-        _context.Set<Prediction>().Update(prediction);
+        var entry = _context.Entry(prediction);
+        if (entry.State == EntityState.Detached)
+        {
+            _context.Set<Prediction>().Update(prediction);
+        }
+        else
+        {
+            // Force EF Core to detect changes in owned entities
+            _context.ChangeTracker.DetectChanges();
+        }
         return Task.CompletedTask;
     }
 

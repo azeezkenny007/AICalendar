@@ -2,21 +2,20 @@ using AICalendar.Application.Predictions.Queries.GetPrediction;
 using AICalendar.Domain.Common;
 using AICalendar.Domain.Interfaces;
 using MediatR;
-using Microsoft.EntityFrameworkCore;
 
 namespace AICalendar.Application.Predictions.Queries.GetUserPredictions;
 
 public class GetUserPredictionsQueryHandler
     : IRequestHandler<GetUserPredictionsQuery, Result<List<PredictionDto>>>
 {
-    private readonly IApplicationDbContext _context;
+    private readonly IPredictionRepository _repository;
     private readonly IUserRepository _userRepository;
 
     public GetUserPredictionsQueryHandler(
-        IApplicationDbContext context,
+        IPredictionRepository repository,
         IUserRepository userRepository)
     {
-        _context = context;
+        _repository = repository;
         _userRepository = userRepository;
     }
 
@@ -30,9 +29,11 @@ public class GetUserPredictionsQueryHandler
             return Result<List<PredictionDto>>.Failure($"User {request.UserId} not found.");
         }
 
-        var predictions = await _context.Predictions
-            .Where(p => p.UserId == request.UserId)
-            .OrderByDescending(p => p.CreatedAt)
+        // Get predictions from repository (fresh from database)
+        var predictions = await _repository.GetByUserIdAsync(request.UserId, cancellationToken);
+
+        // Convert to DTOs
+        var result = predictions
             .Select(p => new PredictionDto(
                 p.Id.Value,
                 p.UserId.Value,
@@ -53,8 +54,8 @@ public class GetUserPredictionsQueryHandler
                     i.Description
                 )).ToList()
             ))
-            .ToListAsync(cancellationToken);
+            .ToList();
 
-        return Result<List<PredictionDto>>.Success(predictions);
+        return Result<List<PredictionDto>>.Success(result);
     }
 }

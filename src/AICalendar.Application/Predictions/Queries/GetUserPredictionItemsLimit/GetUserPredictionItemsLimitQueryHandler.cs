@@ -9,14 +9,14 @@ namespace AICalendar.Application.Predictions.Queries.GetUserPredictionItemsLimit
 public class GetUserPredictionItemsLimitQueryHandler
     : IRequestHandler<GetUserPredictionItemsLimitQuery, Result<List<PredictionDto>>>
 {
-    private readonly IApplicationDbContext _context;
+    private readonly IPredictionRepository _repository;
     private readonly IUserRepository _userRepository;
 
     public GetUserPredictionItemsLimitQueryHandler(
-        IApplicationDbContext context,
+        IPredictionRepository repository,
         IUserRepository userRepository)
     {
-        _context = context;
+        _repository = repository;
         _userRepository = userRepository;
     }
 
@@ -30,53 +30,48 @@ public class GetUserPredictionItemsLimitQueryHandler
             return Result<List<PredictionDto>>.Failure($"User {request.UserId} not found.");
         }
 
-        // Get predictions with items ordered by due date, limited to 10 total items
-        var predictions = await _context.Predictions
-            .Where(p => p.UserId == request.UserId)
-            .OrderByDescending(p => p.CreatedAt)
-            .Select(p => new
-            {
-                Prediction = p,
-                Items = p.Items.OrderBy(i => i.DueDate).ToList()
-            })
-            .ToListAsync(ct);
+        // Get all predictions for the user from repository (fresh from DB)
+        var predictions = await _repository.GetByUserIdAsync(request.UserId, ct);
 
-        // Flatten all items and take first 10
-        var allItems = predictions
-            .SelectMany(p => p.Items.Select(i => new
-            {
-                Item = i,
-                PredictionId = p.Prediction.Id.Value,
-                UserId = p.Prediction.UserId.Value,
-                Status = p.Prediction.Status.ToString(),
-                CreatedAt = p.Prediction.CreatedAt
-            }))
-            .OrderBy(x => x.Item.DueDate)
+        // Convert to DTOs and limit to first 10 items across all predictions
+        var allPredictionsDto = predictions
+            .Select(p => new PredictionDto(
+                p.Id.Value,
+                p.UserId.Value,
+                p.Status.ToString(),
+                p.CreatedAt,
+                p.Items.Select(item => new PredictionItemDto(
+                    item.Id.Value,
+                    item.Merchant,
+                    item.Amount,
+                    item.DueDate,
+                    item.Explanation,
+                    item.Confidence.Value,
+                    item.Pattern.ToString(),
+                    item.IsAccepted,
+                    item.IsEdited,
+                    item.Account,
+                    item.AccountName,
+                    item.Description
+                )).ToList()
+            ))
+            .ToList();
+
+        // Flatten all items, take first 10, and group back into predictions
+        var allItems = allPredictionsDto
+            .SelectMany(p => p.Items.Select(item => new { Prediction = p, Item = item }))
             .Take(request.Limit)
             .ToList();
 
-        // Group back into predictions
+        // Group items back by prediction
         var result = allItems
-            .GroupBy(x => x.PredictionId)
+            .GroupBy(x => x.Prediction.Id)
             .Select(g => new PredictionDto(
                 g.Key,
-                g.First().UserId,
-                g.First().Status,
-                g.First().CreatedAt,
-                g.Select(x => new PredictionItemDto(
-                    x.Item.Id.Value,
-                    x.Item.Merchant,
-                    x.Item.Amount,
-                    x.Item.DueDate,
-                    x.Item.Explanation,
-                    x.Item.Confidence.Value,
-                    x.Item.Pattern.ToString(),
-                    x.Item.IsAccepted,
-                    x.Item.IsEdited,
-                    x.Item.Account,
-                    x.Item.AccountName,
-                    x.Item.Description
-                )).ToList()
+                g.First().Prediction.UserId,
+                g.First().Prediction.Status,
+                g.First().Prediction.CreatedAt,
+                g.Select(x => x.Item).ToList()
             ))
             .ToList();
 

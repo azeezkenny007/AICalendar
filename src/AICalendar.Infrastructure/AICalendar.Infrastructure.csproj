@@ -42,4 +42,8 @@
     <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="Data\SeedData\transactions.json" CopyToOutputDirectory="Always" />
+  </ItemGroup>
+
 </Project>

@@ -76,38 +76,52 @@ public static class UserTransactionSeedData
         // Try to find the file - check multiple possible locations (Docker and local)
         var possiblePaths = new[]
         {
-            // Docker container path
+            // Primary location: relative to application base directory (works in published apps)
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data", "SeedData", "transactions.json"),
+
+            // Fallback for development: current working directory
+            Path.Combine(Directory.GetCurrentDirectory(), "Data", "SeedData", "transactions.json"),
+
+            // Docker container path (if source is mounted)
             "/src/src/AICalendar.Infrastructure/Data/SeedData/transactions.json",
 
-            // Local development paths
-            Path.Combine(Directory.GetCurrentDirectory(), "Data", "SeedData", "transactions.json"),
+            // Additional fallback paths
             Path.Combine(Directory.GetCurrentDirectory(), "..", "AICalendar.Infrastructure", "Data", "SeedData", "transactions.json"),
-            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "SeedData", "transactions.json"),
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "transactions.json"),
 
-            // Absolute path (Windows)
-            @"c:\Users\Purple_Serve\Desktop\AICalendar\src\AICalendar.Infrastructure\Data\SeedData\transactions.json",
-
-            // Relative to this file's location
-            Path.Combine(Path.GetDirectoryName(typeof(UserTransactionSeedData).Assembly.Location) ?? "", "..", "..", "..", "..", "src", "AICalendar.Infrastructure", "Data", "SeedData", "transactions.json")
+            // Absolute path (Windows development only)
+            @"c:\Users\Purple_Serve\Desktop\AICalendar\src\AICalendar.Infrastructure\Data\SeedData\transactions.json"
         };
 
         string? foundPath = null;
         foreach (var path in possiblePaths)
         {
-            var normalizedPath = Path.GetFullPath(path);
-            if (File.Exists(normalizedPath))
+            try
             {
-                foundPath = normalizedPath;
-                break;
+                var normalizedPath = Path.GetFullPath(path);
+                if (File.Exists(normalizedPath))
+                {
+                    foundPath = normalizedPath;
+                    break;
+                }
+            }
+            catch
+            {
+                // Skip invalid paths
+                continue;
             }
         }
 
         if (foundPath == null)
         {
-            var searchedPaths = string.Join("\n  - ", possiblePaths);
+            var searchedPaths = string.Join("\n  - ", possiblePaths.Select(p => {
+                try { return Path.GetFullPath(p); } catch { return p; }
+            }));
             throw new FileNotFoundException(
                 $"Transaction seed data JSON file not found!\n\nSearched in the following locations:\n  - {searchedPaths}\n\n" +
-                "Please ensure transactions.json exists in the Data/SeedData directory.");
+                $"Current Directory: {Directory.GetCurrentDirectory()}\n" +
+                $"Base Directory: {AppDomain.CurrentDomain.BaseDirectory}\n\n" +
+                "Please ensure transactions.json exists in the Data/SeedData directory and is copied to output.");
         }
 
         try

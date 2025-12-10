@@ -1,6 +1,7 @@
 using AICalendar.Application.PushNotifications.Commands.RegisterDevice;
 using AICalendar.Application.PushNotifications.Commands.TestNotification;
 using AICalendar.Application.PushNotifications.Commands.UnregisterDevice;
+using AICalendar.Application.PushNotifications.Queries.CheckDeviceRegistration;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 
@@ -215,6 +216,65 @@ public class PushNotificationsController : ControllerBase
                 _ => StatusCode(500, new { message = result.Error })
             };
     }
+
+    /// <summary>
+    /// Checks if a user has a registered FCM device token
+    /// </summary>
+    /// <param name="userId">The unique identifier of the user to check</param>
+    /// <returns>A boolean indicating whether the user has a registered device token</returns>
+    /// <response code="200">Returns true if the user has a registered device token, false otherwise</response>
+    /// <response code="404">User with the specified ID was not found</response>
+    /// <response code="500">An error occurred while checking device registration</response>
+    /// <remarks>
+    /// Sample request:
+    ///
+    ///     GET /api/push-notifications/check-device/{userId}
+    ///
+    /// Sample 200 response when device is registered:
+    ///
+    ///     {
+    ///       "isRegistered": true
+    ///     }
+    ///
+    /// Sample 200 response when device is not registered:
+    ///
+    ///     {
+    ///       "isRegistered": false
+    ///     }
+    ///
+    /// Sample 404 response:
+    ///
+    ///     {
+    ///       "message": "User not found"
+    ///     }
+    ///
+    /// Sample 500 response:
+    ///
+    ///     {
+    ///       "message": "Failed to check device registration"
+    ///     }
+    ///
+    /// Use this endpoint to check if a user already has a registered FCM device token
+    /// before attempting to register a new one. This helps prevent conflicts and
+    /// provides better user experience by allowing conditional registration flows.
+    /// </remarks>
+    [HttpGet("check-device/{userId:guid}")]
+    [ProducesResponseType(typeof(DeviceRegistrationStatusResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status500InternalServerError)]
+    public async Task<IActionResult> CheckDeviceRegistration(Guid userId)
+    {
+        var query = new CheckDeviceRegistrationQuery(userId);
+        var result = await _mediator.Send(query);
+
+        return result.IsSuccess
+            ? Ok(new { isRegistered = result.Data })
+            : result.StatusCode switch
+            {
+                404 => NotFound(new { message = result.Error }),
+                _ => StatusCode(500, new { message = result.Error })
+            };
+    }
 }
 
 /// <summary>
@@ -229,3 +289,9 @@ public record RegisterDeviceRequest(Guid UserId, string FcmToken);
 /// </summary>
 /// <param name="Message">The message describing the result of the operation</param>
 public record MessageResponse(string Message);
+
+/// <summary>
+/// Response model for device registration status
+/// </summary>
+/// <param name="IsRegistered">Boolean indicating whether the user has a registered FCM device token</param>
+public record DeviceRegistrationStatusResponse(bool IsRegistered);

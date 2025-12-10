@@ -100,4 +100,10 @@ public class OperationResult<T> : OperationResult
     /// </summary>
     public static new OperationResult<T> Conflict(string title, string error, string detail)
         => new(false, 409, error, default, title, detail);
+
+    /// <summary>
+    /// Creates a server error result (500 Internal Server Error)
+    /// </summary>
+    public static new OperationResult<T> ServerError(string title, string error, string detail)
+        => new(false, 500, error, default, title, detail);
 }

@@ -32,6 +32,23 @@ public class FeedbackController : ControllerBase
     ///
     ///     GET /api/feedback/stats/user/3fa85f64-5717-4562-b3fc-2c963f66afa6
     ///
+    /// Sample 200 response:
+    ///
+    ///     {
+    ///       "userId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    ///       "totalFeedback": 45,
+    ///       "acceptedCount": 32,
+    ///       "rejectedCount": 13,
+    ///       "acceptanceRate": 71.11,
+    ///       "predictionAccuracy": 85.5,
+    ///       "engagementScore": 92.3,
+    ///       "lastFeedbackDate": "2025-01-10T14:30:00Z"
+    ///     }
+    ///
+    /// Sample 404 response:
+    ///
+    ///     "User feedback not found"
+    ///
     /// This endpoint provides insights into user engagement with AI predictions and calendar items.
     /// Statistics include total feedback count, positive/negative response ratios, accuracy percentages,
     /// and other metrics useful for improving the AI prediction model and understanding user satisfaction.

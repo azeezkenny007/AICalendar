@@ -35,6 +35,28 @@ public class CalendarController : ControllerBase
     ///
     ///     GET /api/calendar/user/3fa85f64-5717-4562-b3fc-2c963f66afa6
     ///
+    /// Sample 200 response:
+    ///
+    ///     {
+    ///       "calendarId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    ///       "userId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    ///       "items": [
+    ///         {
+    ///           "itemId": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+    ///           "merchant": "Netflix",
+    ///           "amount": 15.99,
+    ///           "dueDate": "2025-01-15T00:00:00Z",
+    ///           "isPaid": false,
+    ///           "account": "Credit Card",
+    ///           "description": "Monthly subscription"
+    ///         }
+    ///       ]
+    ///     }
+    ///
+    /// Sample 404 response:
+    ///
+    ///     "Calendar not found for user"
+    ///
     /// This endpoint is cached for performance. The cache is automatically invalidated when calendar items are modified.
     /// </remarks>
     [HttpGet("user/{userId:guid}")]
@@ -56,6 +78,8 @@ public class CalendarController : ControllerBase
     /// <returns>Success status of the update operation</returns>
     /// <response code="200">If the calendar item was successfully updated. Cache is automatically invalidated.</response>
     /// <response code="400">If the update request is invalid or the item cannot be updated</response>
+    /// <response code="404">If the calendar item is not found</response>
+    /// <response code="409">If there is a conflict with the update (e.g., duplicate entry)</response>
     /// <remarks>
     /// Sample request (update only merchant and amount):
     ///
@@ -70,6 +94,30 @@ public class CalendarController : ControllerBase
     ///     PUT /api/calendar/items/3fa85f64-5717-4562-b3fc-2c963f66afa6
     ///     {
     ///       "dueDate": "2025-02-01T00:00:00Z"
+    ///     }
+    ///
+    /// Sample 200 response:
+    ///
+    ///     {
+    ///       "title": "Item Updated",
+    ///       "message": "Calendar item updated successfully",
+    ///       "data": null
+    ///     }
+    ///
+    /// Sample 400 response:
+    ///
+    ///     {
+    ///       "title": "Validation Error",
+    ///       "error": "At least one field must be provided",
+    ///       "detail": "No fields were provided for update"
+    ///     }
+    ///
+    /// Sample 404 response:
+    ///
+    ///     {
+    ///       "title": "Not Found",
+    ///       "error": "Calendar item not found",
+    ///       "detail": "The specified calendar item does not exist"
     ///     }
     ///
     /// All fields are optional. Only provide the fields you want to update.
@@ -111,12 +159,37 @@ public class CalendarController : ControllerBase
     /// <returns>Success status of the operation</returns>
     /// <response code="200">If the item was successfully marked as paid. Cache is automatically invalidated.</response>
     /// <response code="400">If the request is invalid or the item cannot be marked as paid</response>
+    /// <response code="404">If the calendar item is not found</response>
     /// <remarks>
     /// Sample request:
     ///
     ///     POST /api/calendar/items/3fa85f64-5717-4562-b3fc-2c963f66afa6/mark-paid
     ///     {
     ///       "paidDate": "2025-01-10T14:30:00Z"
+    ///     }
+    ///
+    /// Sample 200 response:
+    ///
+    ///     {
+    ///       "title": "Payment Recorded",
+    ///       "message": "Calendar item marked as paid successfully",
+    ///       "data": null
+    ///     }
+    ///
+    /// Sample 400 response:
+    ///
+    ///     {
+    ///       "title": "Invalid Request",
+    ///       "error": "Invalid payment date",
+    ///       "detail": "Payment date cannot be in the future"
+    ///     }
+    ///
+    /// Sample 404 response:
+    ///
+    ///     {
+    ///       "title": "Not Found",
+    ///       "error": "Calendar item not found",
+    ///       "detail": "The specified calendar item does not exist"
     ///     }
     ///
     /// This operation updates the payment status and invalidates the calendar cache for the associated user.

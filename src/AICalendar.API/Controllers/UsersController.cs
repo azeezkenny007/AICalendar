@@ -35,6 +35,29 @@ public class UsersController : ControllerBase
     ///
     ///     GET /api/users
     ///
+    /// Sample 200 response:
+    ///
+    ///     [
+    ///       {
+    ///         "userId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    ///         "email": "user@example.com",
+    ///         "name": "John Doe",
+    ///         "createdAt": "2025-01-01T10:00:00Z",
+    ///         "hasPushNotifications": true
+    ///       },
+    ///       {
+    ///         "userId": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+    ///         "email": "jane@example.com",
+    ///         "name": "Jane Smith",
+    ///         "createdAt": "2025-01-05T14:30:00Z",
+    ///         "hasPushNotifications": false
+    ///       }
+    ///     ]
+    ///
+    /// Sample 500 response:
+    ///
+    ///     "An error occurred while retrieving users"
+    ///
     /// </remarks>
     [HttpGet]
     [ProducesResponseType(typeof(List<UserDto>), StatusCodes.Status200OK)]
@@ -67,6 +90,26 @@ public class UsersController : ControllerBase
     /// Sample request:
     ///
     ///     GET /api/users/3fa85f64-5717-4562-b3fc-2c963f66afa6
+    ///
+    /// Sample 200 response:
+    ///
+    ///     {
+    ///       "userId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    ///       "email": "user@example.com",
+    ///       "name": "John Doe",
+    ///       "createdAt": "2025-01-01T10:00:00Z",
+    ///       "hasPushNotifications": true,
+    ///       "totalPredictions": 15,
+    ///       "totalCalendarItems": 42
+    ///     }
+    ///
+    /// Sample 404 response:
+    ///
+    ///     "User not found"
+    ///
+    /// Sample 500 response:
+    ///
+    ///     "An error occurred while retrieving the user"
     ///
     /// </remarks>
     [HttpGet("{userId:guid}")]

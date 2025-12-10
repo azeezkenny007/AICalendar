@@ -64,22 +64,12 @@ builder.Services.AddSwaggerGen(c =>
     c.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
     {
         Title = "AICalendar API",
-        Version = "v1",
-        Description = @"AI-powered calendar and prediction API with intelligent payment tracking and forecasting.
-
-## Features
-- **Predictions**: AI-generated payment predictions from transaction history
-- **Calendar**: Manage scheduled payments with due dates and tracking
-- **Feedback**: User feedback collection and management system
-- **Push Notifications**: Firebase Cloud Messaging for device notifications
-- **Health Monitoring**: Comprehensive health checks for all infrastructure components
-
-## Caching
-Calendar endpoints use Redis caching for improved performance (1-hour TTL).
-Cache is automatically invalidated on data modifications.",
+        Version = "v1.0",
+        Description = "AI-Powered Payment Prediction & Calendar Management API with support for predictions, calendar management, user management, notifications, and health monitoring.",
         Contact = new Microsoft.OpenApi.Models.OpenApiContact
         {
-            Name = "AICalendar Team"
+            Name = "AICalendar Development Team",
+            Email = "support@aicalendar.com"
         }
     });
 
@@ -91,8 +81,28 @@ Cache is automatically invalidated on data modifications.",
         c.IncludeXmlComments(xmlPath, includeControllerXmlComments: true);
     }
 
-    // Order actions by API path for better organization
-    c.OrderActionsBy(apiDesc => $"{apiDesc.ActionDescriptor.RouteValues["controller"]}_{apiDesc.RelativePath}");
+    // Group by controller for better organization
+    c.TagActionsBy(api =>
+    {
+        var controllerName = api.ActionDescriptor.RouteValues["controller"];
+        return new[] { controllerName ?? "Default" };
+    });
+
+    // Order actions alphabetically within each group
+    c.OrderActionsBy(apiDesc =>
+    {
+        var controller = apiDesc.ActionDescriptor.RouteValues["controller"];
+        var action = apiDesc.ActionDescriptor.RouteValues["action"];
+        return $"{controller}_{apiDesc.HttpMethod}_{apiDesc.RelativePath}";
+    });
+
+    // Add custom operation IDs for better documentation
+    c.CustomOperationIds(apiDesc =>
+    {
+        var controller = apiDesc.ActionDescriptor.RouteValues["controller"];
+        var action = apiDesc.ActionDescriptor.RouteValues["action"];
+        return $"{controller}_{action}";
+    });
 });
 
 // Configure DbContext with Interceptors

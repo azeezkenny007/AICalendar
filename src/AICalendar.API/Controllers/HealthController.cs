@@ -49,6 +49,13 @@ public class HealthController : ControllerBase
     ///
     ///     GET /health
     ///
+    /// Sample 200 response:
+    ///
+    ///     {
+    ///       "status": "healthy",
+    ///       "timestamp": "2025-01-10T14:30:00Z"
+    ///     }
+    ///
     /// This lightweight endpoint is used by Docker healthchecks and load balancers.
     /// It only verifies the API process is running, not infrastructure dependencies.
     /// For detailed infrastructure checks, use GET /health/detailed
@@ -75,8 +82,40 @@ public class HealthController : ControllerBase
     ///
     ///     GET /health/detailed
     ///
+    /// Sample 200 response (all healthy):
+    ///
+    ///     {
+    ///       "status": "healthy",
+    ///       "timestamp": "2025-01-10T14:30:00Z",
+    ///       "checks": {
+    ///         "database": "healthy",
+    ///         "redis": "healthy",
+    ///         "apihealth": "healthy",
+    ///         "hangfire": "healthy",
+    ///         "prometheus": "healthy",
+    ///         "grafana": "healthy",
+    ///         "seq": "healthy"
+    ///       }
+    ///     }
+    ///
+    /// Sample 503 response (unhealthy):
+    ///
+    ///     {
+    ///       "status": "healthy",
+    ///       "timestamp": "2025-01-10T14:30:00Z",
+    ///       "checks": {
+    ///         "database": "healthy",
+    ///         "redis": "unhealthy",
+    ///         "apihealth": "healthy",
+    ///         "hangfire": "unhealthy",
+    ///         "prometheus": "healthy",
+    ///         "grafana": "healthy",
+    ///         "seq": "healthy"
+    ///       }
+    ///     }
+    ///
     /// This endpoint checks:
-    /// - Database connectivity (PostgreSQL)
+    /// - Database connectivity (SQL Server)
     /// - Redis cache connectivity (if configured)
     /// - API internal services and DI container
     /// - Hangfire background job server
@@ -137,6 +176,24 @@ public class HealthController : ControllerBase
     /// Sample request:
     ///
     ///     GET /health/cache-test
+    ///
+    /// Sample 200 response (success):
+    ///
+    ///     {
+    ///       "status": "success",
+    ///       "directGet": "cache_working",
+    ///       "getOrSet": "generated_value",
+    ///       "timestamp": "2025-01-10T14:30:00Z"
+    ///     }
+    ///
+    /// Sample 200 response (failed):
+    ///
+    ///     {
+    ///       "status": "failed",
+    ///       "directGet": null,
+    ///       "getOrSet": "generated_value",
+    ///       "timestamp": "2025-01-10T14:30:00Z"
+    ///     }
     ///
     /// This endpoint performs three cache operations:
     /// 1. SetAsync - Writes a test value to cache

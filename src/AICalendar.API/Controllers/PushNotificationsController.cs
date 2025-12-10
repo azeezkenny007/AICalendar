@@ -34,10 +34,34 @@ public class PushNotificationsController : ControllerBase
     /// <remarks>
     /// Sample request:
     ///
-    ///     POST /api/users/register-device
+    ///     POST /api/push-notifications/register-device
     ///     {
     ///       "userId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-    ///       "fcmToken": "fGcI7X8kRZuQ9..."
+    ///       "fcmToken": "fGcI7X8kRZuQ9Y2vN3pL4mK5jH6gF7dS8aA9zX0cV1bN2mM3"
+    ///     }
+    ///
+    /// Sample 200 response:
+    ///
+    ///     {
+    ///       "message": "Device registered successfully"
+    ///     }
+    ///
+    /// Sample 400 response:
+    ///
+    ///     {
+    ///       "message": "Invalid FCM token format"
+    ///     }
+    ///
+    /// Sample 404 response:
+    ///
+    ///     {
+    ///       "message": "User not found"
+    ///     }
+    ///
+    /// Sample 409 response:
+    ///
+    ///     {
+    ///       "message": "User already has a registered device"
     ///     }
     ///
     /// The FCM token should be obtained from Firebase SDK on the client device.
@@ -79,7 +103,31 @@ public class PushNotificationsController : ControllerBase
     /// <remarks>
     /// Sample request:
     ///
-    ///     POST /api/users/test-notification/3fa85f64-5717-4562-b3fc-2c963f66afa6
+    ///     POST /api/push-notifications/test-notification/3fa85f64-5717-4562-b3fc-2c963f66afa6
+    ///
+    /// Sample 200 response:
+    ///
+    ///     {
+    ///       "message": "Test notification sent successfully"
+    ///     }
+    ///
+    /// Sample 400 response:
+    ///
+    ///     {
+    ///       "message": "User has no registered device"
+    ///     }
+    ///
+    /// Sample 404 response:
+    ///
+    ///     {
+    ///       "message": "User not found"
+    ///     }
+    ///
+    /// Sample 500 response:
+    ///
+    ///     {
+    ///       "message": "Failed to send notification"
+    ///     }
     ///
     /// This endpoint is useful for testing that Firebase Cloud Messaging is properly configured
     /// and that the user's device is correctly receiving notifications.
@@ -117,7 +165,31 @@ public class PushNotificationsController : ControllerBase
     /// <remarks>
     /// Sample request:
     ///
-    ///     POST /api/users/unregister-device/3fa85f64-5717-4562-b3fc-2c963f66afa6
+    ///     POST /api/push-notifications/unregister-device/3fa85f64-5717-4562-b3fc-2c963f66afa6
+    ///
+    /// Sample 200 response:
+    ///
+    ///     {
+    ///       "message": "Device unregistered successfully"
+    ///     }
+    ///
+    /// Sample 400 response:
+    ///
+    ///     {
+    ///       "message": "User has no registered device"
+    ///     }
+    ///
+    /// Sample 404 response:
+    ///
+    ///     {
+    ///       "message": "User not found"
+    ///     }
+    ///
+    /// Sample 500 response:
+    ///
+    ///     {
+    ///       "message": "Failed to unregister device"
+    ///     }
     ///
     /// Call this endpoint when a user logs out or when they want to stop receiving push notifications.
     /// After unregistering, the user will not receive any push notifications until they register a new device token.

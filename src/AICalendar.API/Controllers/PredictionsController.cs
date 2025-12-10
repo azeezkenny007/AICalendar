@@ -4,6 +4,7 @@ using AICalendar.Application.Predictions.Commands.EditPredictionItem;
 using AICalendar.Application.Predictions.Queries.GetPrediction;
 using AICalendar.Application.Predictions.Queries.GetUserPredictions;
 using AICalendar.Application.Predictions.Queries.GetUserPredictionsByMonth;
+using AICalendar.Application.Predictions.Queries.GetUserPredictionItemsLimit;
 using AICalendar.Domain.ValueObjects;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
@@ -295,6 +296,63 @@ public class PredictionsController : ControllerBase
         var result = await _mediator.Send(command);
 
         return result.IsSuccess ? Ok() : BadRequest(result.Error);
+    }
+
+    /// <summary>
+    /// Retrieves user predictions with a limit of 10 total items (ordered by due date)
+    /// </summary>
+    /// <param name="userId">The unique identifier of the user</param>
+    /// <returns>A list of predictions containing up to 10 total items</returns>
+    /// <response code="200">Returns predictions with max 10 items total</response>
+    /// <response code="404">If the user is not found</response>
+    /// <remarks>
+    /// Sample request:
+    ///
+    ///     GET /api/predictions/user/3fa85f64-5717-4562-b3fc-2c963f66afa6/items-limit
+    ///
+    /// Sample 200 response:
+    ///
+    ///     [
+    ///       {
+    ///         "id": "1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p",
+    ///         "userId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    ///         "status": "Generated",
+    ///         "createdAt": "2025-01-10T14:30:00Z",
+    ///         "items": [
+    ///           {
+    ///             "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    ///             "merchant": "Netflix",
+    ///             "amount": 15.99,
+    ///             "dueDate": "2025-12-15T00:00:00Z",
+    ///             "explanation": "Monthly subscription detected",
+    ///             "confidence": 0.95,
+    ///             "pattern": "FixedDateRecurring",
+    ///             "isAccepted": null,
+    ///             "isEdited": false,
+    ///             "account": null,
+    ///             "accountName": null,
+    ///             "description": null
+    ///           }
+    ///         ]
+    ///       }
+    ///     ]
+    ///
+    /// Sample 404 response:
+    ///
+    ///     "User not found"
+    ///
+    /// This endpoint returns predictions with only the first 10 items ordered by due date.
+    /// Format matches /api/predictions/user/{userId} but limited to 10 items.
+    /// </remarks>
+    [HttpGet("user/{userId:guid}/items-limit")]
+    [ProducesResponseType(typeof(List<AICalendar.Application.Predictions.Queries.GetPrediction.PredictionDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetUserPredictionItemsLimit(Guid userId)
+    {
+        var query = new GetUserPredictionItemsLimitQuery(UserId.Create(userId), Limit: 10);
+        var result = await _mediator.Send(query);
+
+        return result.IsSuccess ? Ok(result.Value) : NotFound(result.Error);
     }
 
     /// <summary>

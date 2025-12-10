@@ -26,6 +26,7 @@ public class PredictionRepository : IPredictionRepository
     {
         return await _context.Set<Prediction>()
             .Include(p => p.Items)
+            .AsTracking()
             .FirstOrDefaultAsync(p => p.Items.Any(i => i.Id == itemId), ct);
     }
 

@@ -412,8 +412,5 @@ FodyWeavers.xsd
 appsettings.Development.json
 appsettings.Production.json
 
-# Entity Framework Migrations
-**/Migrations/
-
 # Firebase credentials
 **/firebase-credentials.json

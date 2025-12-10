@@ -24,15 +24,15 @@ services:
       - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development}
       - ASPNETCORE_URLS=http://+:8080
 
-      # Database Connection (SQL Server)
-      - ConnectionStrings__DefaultConnection=Server=db;Database=AICalendarDb;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;
+      # Database Connection (SQL Server) - Full connection string from .env
+      - ConnectionStrings__DefaultConnection=${SQL_CONNECTION_STRING:-Server=db;Database=AICalendarDb;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;}
       # Redis Connection
-      - ConnectionStrings__RedisConnection=redis:6379,password=${REDIS_PASSWORD:-devpassword},abortConnect=false
+      - ConnectionStrings__RedisConnection=${REDIS_CONNECTION_STRING:-redis:6379,password=${REDIS_PASSWORD:-devpassword},abortConnect=false}
 
       # Logging (Reduce verbosity)
       - Logging__LogLevel__Default=Information
       - Logging__LogLevel__Microsoft=Warning
-      - Logging__LogLevel__Microsoft.EntityFrameworkCore=Warning
+      - Logging__LogLevel__Microsoft.EntityFrameworkCore=Warninggg
       - Logging__LogLevel__Microsoft.AspNetCore=Warning
       - Logging__LogLevel__Microsoft.Hosting.Lifetime=Information
       - Logging__Console__FormatterName=Simple

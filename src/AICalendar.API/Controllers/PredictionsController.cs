@@ -195,7 +195,7 @@ public class PredictionsController : ControllerBase
     /// </summary>
     /// <param name="itemId">The unique identifier of the prediction item</param>
     /// <param name="request">The details to update (all fields optional)</param>
-    /// <returns>Success status</returns>
+    /// <returns>Success status with message</returns>
     /// <response code="200">If the item was successfully updated</response>
     /// <response code="400">If the update request is invalid</response>
     /// <remarks>
@@ -209,7 +209,9 @@ public class PredictionsController : ControllerBase
     ///
     /// Sample 200 response:
     ///
-    ///     200 OK
+    ///     {
+    ///       "message": "Prediction item has been successfully edited"
+    ///     }
     ///
     /// Sample 400 response:
     ///
@@ -218,7 +220,7 @@ public class PredictionsController : ControllerBase
     /// All fields are optional. Only provide the fields you want to update.
     /// </remarks>
     [HttpPut("items/{itemId:guid}")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(object), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> EditItem(Guid itemId, [FromBody] EditItemRequest request)
     {
@@ -234,7 +236,9 @@ public class PredictionsController : ControllerBase
 
         var result = await _mediator.Send(command);
 
-        return result.IsSuccess ? Ok() : BadRequest(result.Error);
+        return result.IsSuccess
+            ? Ok(new { message = "Prediction item has been successfully edited" })
+            : BadRequest(result.Error);
     }
 
     /// <summary>
@@ -345,14 +349,15 @@ public class PredictionsController : ControllerBase
 /// <summary>
 /// Request model for editing a prediction item
 /// </summary>
-public record EditItemRequest(
-    string? Merchant,
-    decimal? Amount,
-    DateTime? DueDate,
-    string? Account,
-    string? AccountName,
-    string? Description
-);
+public record EditItemRequest
+{
+    public string? Merchant { get; init; }
+    public decimal? Amount { get; init; }
+    public DateTime? DueDate { get; init; }
+    public string? Account { get; init; }
+    public string? AccountName { get; init; }
+    public string? Description { get; init; }
+}
 
 /// <summary>
 /// Request model for batch processing prediction items.

@@ -263,26 +263,17 @@ app.UseResponseCompression();
 // Add global exception handling middleware (must be first in pipeline)
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
-// Swagger should be available in Development
-if (app.Environment.IsDevelopment())
+// Enable Swagger in all environments (Development and Production)
+app.UseSwagger();
+app.UseSwaggerUI(c =>
 {
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "AICalendar API v1");
-        c.RoutePrefix = "swagger"; // Swagger UI at /swagger instead of /swagger/index.html
-        c.DisplayRequestDuration();
-        c.EnableDeepLinking();
-        c.EnableFilter();
-        c.EnableValidator();
-    });
-}
-else
-{
-    // In production, don't use DeveloperExceptionPage
-    app.UseHsts();
-}
-
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "AICalendar API v1");
+    c.RoutePrefix = "swagger"; // Swagger UI at /swagger instead of /swagger/index.html
+    c.DisplayRequestDuration();
+    c.EnableDeepLinking();
+    c.EnableFilter();
+    c.EnableValidator();
+});
 
 // Initialize Hangfire recurring jobs
 using (var scope = app.Services.CreateScope())

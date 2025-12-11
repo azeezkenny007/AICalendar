@@ -46,6 +46,14 @@ public class PredictionRepository : IPredictionRepository
             .ToListAsync(ct);
     }
 
+    public async Task<List<Prediction>> GetAllAsync(CancellationToken ct = default)
+    {
+        return await _context.Set<Prediction>()
+            .Include(p => p.Items)
+            .OrderByDescending(p => p.CreatedAt)
+            .ToListAsync(ct);
+    }
+
     public async Task AddAsync(Prediction prediction, CancellationToken ct = default)
     {
         await _context.Set<Prediction>().AddAsync(prediction, ct);

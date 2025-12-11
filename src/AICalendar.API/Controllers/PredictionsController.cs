@@ -1,4 +1,5 @@
 using AICalendar.Application.Predictions.Commands.BatchProcessPredictionItems;
+using AICalendar.Application.Predictions.Commands.DeleteAllPredictions;
 using AICalendar.Application.Predictions.Commands.CreateTestPrediction;
 using AICalendar.Application.Predictions.Commands.EditPredictionItem;
 using AICalendar.Application.Predictions.Queries.GetPrediction;
@@ -414,6 +415,42 @@ public class PredictionsController : ControllerBase
         return result.IsSuccess
             ? Ok(result.Value)
             : BadRequest(result.Error);
+    }
+
+    /// <summary>
+    /// Deletes all prediction data from the system (Admin operation)
+    /// </summary>
+    /// <returns>The number of prediction records deleted</returns>
+    /// <response code="200">Successfully deleted all prediction data</response>
+    /// <response code="400">If there was an error during deletion</response>
+    /// <remarks>
+    /// This is an administrative operation that removes all prediction records from the system.
+    /// Use with caution as this action cannot be undone.
+    ///
+    /// Sample request:
+    ///
+    ///     DELETE /api/predictions/delete-all
+    ///
+    /// Sample 200 response:
+    ///
+    ///     {
+    ///       "isSuccess": true,
+    ///       "value": {
+    ///         "deletedRecordCount": 10
+    ///       }
+    ///     }
+    /// </remarks>
+    [HttpDelete("delete-all")]
+    public async Task<IActionResult> DeleteAllPredictions()
+    {
+        var result = await _mediator.Send(new DeleteAllPredictionsCommand());
+        
+        if (result.IsSuccess && result.Value != null)
+        {
+            return Ok(new { isSuccess = true, value = result.Value });
+        }
+
+        return BadRequest(new { isSuccess = false, error = result.Error });
     }
 }
 

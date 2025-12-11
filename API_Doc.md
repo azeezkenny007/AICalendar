@@ -6,6 +6,7 @@
 
 ---
 
+
 ## Overview
 
 The Predictive Calendar API analyzes users' transaction history to generate personalized calendar suggestions for recurring payments. The service identifies patterns in past transactions and predicts future occurrences.

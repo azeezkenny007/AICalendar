@@ -1,4 +1,5 @@
 using AICalendar.Domain.Common;
+using System.Text.Json.Serialization;
 
 namespace AICalendar.Domain.ValueObjects;
 
@@ -7,7 +8,12 @@ public class PredictionCycle : ValueObject
     public DateTime StartDate { get; }
     public DateTime EndDate { get; }
 
-    private PredictionCycle(DateTime startDate, DateTime endDate)
+    // Private parameterless constructor for EF Core
+    private PredictionCycle() { }
+
+    // Public constructor with JsonConstructor attribute for JSON deserialization
+    [JsonConstructor]
+    public PredictionCycle(DateTime startDate, DateTime endDate)
     {
         if (startDate >= endDate)
         {

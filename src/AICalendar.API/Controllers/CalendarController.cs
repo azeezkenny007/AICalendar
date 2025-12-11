@@ -1,3 +1,4 @@
+using AICalendar.Application.Calendar.Commands.DeleteAllCalendarData;
 using AICalendar.Application.Calendar.Commands.EditCalendarItem;
 using AICalendar.Application.Calendar.Commands.MarkItemAsPaid;
 using AICalendar.Application.Calendar.Queries.GetUserCalendar;
@@ -215,6 +216,51 @@ public class CalendarController : ControllerBase
             404 => NotFound(new ErrorResponse(result.Title!, result.Error!, result.Detail!)),
             _ => BadRequest(new ErrorResponse(result.Title!, result.Error!, result.Detail!))
         };
+    }
+
+    /// <summary>
+    /// Deletes all calendar data from the system (Admin operation)
+    /// </summary>
+    /// <returns>The number of calendar records deleted</returns>
+    /// <response code="200">Successfully deleted all calendar data</response>
+    /// <response code="400">If there was an error during deletion</response>
+    /// <remarks>
+    /// This is an administrative operation that removes all calendar records from the system.
+    /// Use with caution as this action cannot be undone.
+    ///
+    /// Sample request:
+    ///
+    ///     DELETE /api/calendar/delete-all
+    ///
+    /// Sample 200 response:
+    ///
+    ///     {
+    ///       "title": "Success",
+    ///       "message": "All calendar data has been deleted successfully",
+    ///       "data": {
+    ///         "deletedRecordCount": 5
+    ///       }
+    ///     }
+    /// </remarks>
+    [HttpDelete("delete-all")]
+    public async Task<IActionResult> DeleteAllCalendarData()
+    {
+        var result = await _mediator.Send(new DeleteAllCalendarDataCommand());
+        
+        if (result.IsSuccess && result.Value != null)
+        {
+            return Ok(new SuccessResponse(
+                "Success",
+                "All calendar data has been deleted successfully",
+                new { deletedRecordCount = result.Value.DeletedRecordCount }
+            ));
+        }
+
+        return BadRequest(new ErrorResponse(
+            "Delete Failed",
+            result.Error,
+            "An error occurred while deleting calendar data"
+        ));
     }
 }
 

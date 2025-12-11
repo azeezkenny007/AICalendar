@@ -73,6 +73,7 @@ public class OutboxProcessorJob
     public async Task ProcessOutboxEvent(Guid messageId, string eventTypeDisplayName)
     {
         var message = await _context.Set<OutboxMessage>().FindAsync(messageId);
+       _logger.LogInformation("Processing outbox message {MessageId} of type {EventType}", messageId, eventTypeDisplayName);
 
         if (message == null)
         {
@@ -90,6 +91,11 @@ public class OutboxProcessorJob
         {
             // 2. Deserialize the domain event
             var eventType = Type.GetType(message.Type);
+            _logger.LogInformation(
+                "Deserializing event of type {EventType} for message {MessageId}",
+                eventType?.Name ?? "Unknown",
+                message.Id
+            );
 
             if (eventType == null)
             {
@@ -104,7 +110,63 @@ public class OutboxProcessorJob
                 return;
             }
 
-            var domainEvent = JsonSerializer.Deserialize(message.Content, eventType);
+            _logger.LogInformation(
+                "Resolved event type {EventType} for message {MessageId}",
+                eventType.Name,
+                message.Id
+            );
+
+            _logger.LogInformation(
+                "Attempting to deserialize event content for message {MessageId}. Content length: {ContentLength}",
+                message.Id,
+                message.Content?.Length ?? 0
+            );
+
+            if (string.IsNullOrEmpty(message.Content))
+            {
+                _logger.LogError(
+                    "Event content is null or empty for message {MessageId}",
+                    message.Id
+                );
+                message.Error = "Event content is null or empty";
+                message.RetryCount++;
+                await _context.SaveChangesAsync();
+                return;
+            }
+
+            object? domainEvent = null;
+            try
+            {
+                domainEvent = JsonSerializer.Deserialize(message.Content, eventType);
+            }
+            catch (JsonException jsonEx)
+            {
+                _logger.LogError(
+                    jsonEx,
+                    "JSON deserialization failed for event {EventType} in message {MessageId}. Error: {ErrorMessage}",
+                    eventType.Name,
+                    message.Id,
+                    jsonEx.Message
+                );
+                message.Error = $"JSON deserialization failed: {jsonEx.Message}";
+                message.RetryCount++;
+                await _context.SaveChangesAsync();
+                return;
+            }
+            catch (Exception deserializeEx)
+            {
+                _logger.LogError(
+                    deserializeEx,
+                    "Unexpected error deserializing event {EventType} in message {MessageId}. Error: {ErrorMessage}",
+                    eventType.Name,
+                    message.Id,
+                    deserializeEx.Message
+                );
+                message.Error = $"Deserialization error: {deserializeEx.Message}";
+                message.RetryCount++;
+                await _context.SaveChangesAsync();
+                return;
+            }
 
             if (domainEvent == null)
             {
@@ -119,9 +181,15 @@ public class OutboxProcessorJob
                 return;
             }
 
+            _logger.LogInformation(
+                "Successfully deserialized event {EventType} for message {MessageId}",
+                eventType.Name,
+                message.Id
+            );
+
             // 3. Publish to MediatR (triggers all event handlers)
-            _logger.LogDebug(
-                "Publishing event {EventType} from message {MessageId}",
+            _logger.LogInformation(
+                "Creating notification wrapper for event {EventType} from message {MessageId}",
                 eventType.Name,
                 message.Id
             );
@@ -135,13 +203,28 @@ public class OutboxProcessorJob
                  throw new InvalidOperationException($"Failed to create notification wrapper for event type {eventType.Name}");
             }
 
+            _logger.LogInformation(
+                "Publishing notification for event {EventType} to MediatR for message {MessageId}",
+                eventType.Name,
+                message.Id
+            );
+
             await _publisher.Publish(notification);
+
+            _logger.LogInformation(
+                "Successfully published event {EventType} for message {MessageId}",
+                eventType.Name,
+                message.Id
+            );
 
             // 4. Mark as processed
             message.ProcessedOnUtc = DateTime.UtcNow;
             message.Error = null;
 
-            _logger.LogDebug(
+            // Explicitly mark the entity as modified to ensure EF Core tracks the changes
+            _context.Entry(message).State = Microsoft.EntityFrameworkCore.EntityState.Modified;
+
+            _logger.LogInformation(
                 "Successfully processed message {MessageId} of type {EventType}",
                 message.Id,
                 eventType.Name
@@ -171,8 +254,10 @@ public class OutboxProcessorJob
                 );
             }
         }
-
+        
+        _logger.LogDebug("Saving changes for outbox message {MessageId}", message.Id);
         await _context.SaveChangesAsync();
+        _logger.LogDebug("Changes saved for outbox message {MessageId}", message.Id);
     }
 
     /// <summary>

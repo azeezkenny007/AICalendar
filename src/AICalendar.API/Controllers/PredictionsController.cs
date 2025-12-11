@@ -8,6 +8,7 @@ using AICalendar.Application.Predictions.Queries.GetUserPredictionItemsLimit;
 using AICalendar.Domain.ValueObjects;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OutputCaching;
 
 // dummy code
 
@@ -112,6 +113,7 @@ public class PredictionsController : ControllerBase
     ///
     /// </remarks>
     [HttpGet("user/{userId:guid}")]
+    [OutputCache(PolicyName = "predictions-short")]
     [ProducesResponseType(typeof(List<Domain.Aggregates.PredictionAggregate.Prediction>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetUserPredictions(Guid userId)
@@ -345,6 +347,7 @@ public class PredictionsController : ControllerBase
     /// Format matches /api/predictions/user/{userId} but limited to 10 items.
     /// </remarks>
     [HttpGet("user/{userId:guid}/items-limit")]
+    [OutputCache(PolicyName = "predictions-short")]
     [ProducesResponseType(typeof(List<AICalendar.Application.Predictions.Queries.GetPrediction.PredictionDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetUserPredictionItemsLimit(Guid userId)

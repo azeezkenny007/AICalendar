@@ -39,6 +39,11 @@ public class PredictionConfiguration : IEntityTypeConfiguration<Prediction>
         builder.Property(p => p.CreatedAt).IsRequired();
         builder.Property(p => p.UpdatedAt).IsRequired();
 
+        // Add performance indexes
+        builder.HasIndex(p => p.UserId);
+        builder.HasIndex(p => p.CreatedAt);
+        builder.HasIndex(p => p.Status);
+
         // Configure owned collection of PredictionItems using backing field
         builder.OwnsMany(p => p.Items, item =>
         {
@@ -80,6 +85,11 @@ public class PredictionConfiguration : IEntityTypeConfiguration<Prediction>
             item.Property(i => i.IsEdited);
             item.Property(i => i.OriginalAmount).HasPrecision(18, 2);
             item.Property(i => i.OriginalDueDate);
+
+            // Add indexes for PredictionItems
+            item.HasIndex("PredictionId");
+            item.HasIndex(i => i.DueDate);
+            item.HasIndex(i => i.IsAccepted);
         });
 
         // Use backing field for Items collection

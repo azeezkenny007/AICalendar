@@ -5,6 +5,7 @@ using AICalendar.Domain.Common;
 using AICalendar.Domain.ValueObjects;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OutputCaching;
 
 namespace AICalendar.API.Controllers;
 
@@ -60,6 +61,7 @@ public class CalendarController : ControllerBase
     /// This endpoint is cached for performance. The cache is automatically invalidated when calendar items are modified.
     /// </remarks>
     [HttpGet("user/{userId:guid}")]
+    [OutputCache(PolicyName = "calendar-short")]
     [ProducesResponseType(typeof(CalendarDto), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(string), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetUserCalendar(Guid userId)

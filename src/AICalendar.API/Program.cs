@@ -49,6 +49,27 @@ builder.Services.AddResponseCompression(options =>
         new BrotliCompressionProviderOptions { Level = CompressionLevel.Fastest }));
 });
 
+// Add output caching for performance
+builder.Services.AddOutputCache(options =>
+{
+    options.AddBasePolicy(builder => builder.Expire(TimeSpan.FromSeconds(10)));
+
+    options.AddPolicy("predictions-short", builder =>
+        builder.Expire(TimeSpan.FromSeconds(30))
+               .SetVaryByQuery("userId")
+               .Tag("predictions"));
+
+    options.AddPolicy("calendar-short", builder =>
+        builder.Expire(TimeSpan.FromSeconds(30))
+               .SetVaryByQuery("userId")
+               .Tag("calendar"));
+
+    options.AddPolicy("notifications-short", builder =>
+        builder.Expire(TimeSpan.FromSeconds(10))
+               .SetVaryByQuery("userId")
+               .Tag("notifications"));
+});
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
@@ -122,6 +143,11 @@ builder.Services.AddDbContext<ApplicationDbContext>((serviceProvider, options) =
 
         // Set command timeout to 60 seconds
         sqlOptions.CommandTimeout(60);
+
+        // Performance optimizations
+        sqlOptions.MaxBatchSize(100);
+        sqlOptions.MinBatchSize(2);
+        sqlOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
     });
 
     // Set global query tracking behavior to NoTracking
@@ -191,6 +217,9 @@ builder.Services.AddHangfireServices(builder.Configuration);
 
 // Register Cache Services (Redis or Null based on configuration)
 builder.Services.AddCacheServices(builder.Configuration);
+
+// Register cache invalidator
+builder.Services.AddScoped<AICalendar.Application.Common.Interfaces.ICacheInvalidator, AICalendar.Infrastructure.Services.OutputCacheInvalidator>();
 
 // ═══════════════════════════════════════════════════════════
 // Firebase Cloud Messaging Configuration
@@ -292,6 +321,9 @@ using (var scope = app.Services.CreateScope())
         logger.LogError(ex, "Failed to configure Hangfire recurring jobs");
     }
 }
+
+// Add output caching middleware
+app.UseOutputCache();
 
 app.UseRouting();
 

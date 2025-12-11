@@ -1,3 +1,4 @@
+using AICalendar.Application.Common.Interfaces;
 using AICalendar.Domain.Common;
 using AICalendar.Domain.Interfaces;
 using MediatR;
@@ -11,15 +12,18 @@ public class EditPredictionItemCommandHandler
     private readonly IPredictionRepository _repository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<EditPredictionItemCommandHandler> _logger;
+    private readonly ICacheInvalidator _cacheInvalidator;
 
     public EditPredictionItemCommandHandler(
         IPredictionRepository repository,
         IUnitOfWork unitOfWork,
-        ILogger<EditPredictionItemCommandHandler> logger)
+        ILogger<EditPredictionItemCommandHandler> logger,
+        ICacheInvalidator cacheInvalidator)
     {
         _repository = repository;
         _unitOfWork = unitOfWork;
         _logger = logger;
+        _cacheInvalidator = cacheInvalidator;
     }
 
     public async Task<Result> Handle(
@@ -55,6 +59,9 @@ public class EditPredictionItemCommandHandler
 
         await _repository.UpdateAsync(prediction, ct);
         await _unitOfWork.SaveChangesAsync(ct);
+
+        // Invalidate cache for predictions
+        await _cacheInvalidator.InvalidatePredictionsCacheAsync(ct);
 
         _logger.LogInformation(
             "Successfully edited prediction item {ItemId}",

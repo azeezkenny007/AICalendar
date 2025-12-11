@@ -1,0 +1,182 @@
+[
+  {
+    "Location": "spaincentral",
+    "Name": "aicalendar-vnet",
+    "Type": "Microsoft.Network/virtualNetworks"
+  },
+  {
+    "Location": "spaincentral",
+    "Name": "aicalendar-logs",
+    "Type": "Microsoft.OperationalInsights/workspaces"
+  },
+  {
+    "Location": "spaincentral",
+    "Name": "aicalendaracrefb04d",
+    "Type": "Microsoft.ContainerRegistry/registries"
+  },
+  {
+    "Location": "spaincentral",
+    "Name": "aicalendar-kv-95387c",
+    "Type": "Microsoft.KeyVault/vaults"
+  },
+  {
+    "Location": "spaincentral",
+    "Name": "aicalendar-sql-81816c",
+    "Type": "Microsoft.Sql/servers"
+  },
+  {
+    "Location": "spaincentral",
+    "Name": "aicalendar-sql-81816c/master",
+    "Type": "Microsoft.Sql/servers/databases"
+  },
+  {
+    "Location": "spaincentral",
+    "Name": "aicalendar-sql-81816c/AICalendarDb",
+    "Type": "Microsoft.Sql/servers/databases"
+  },
+  {
+    "Location": "spaincentral",
+    "Name": "sql-private-endpoint",
+    "Type": "Microsoft.Network/privateEndpoints"
+  },
+  {
+    "Location": "spaincentral",
+    "Name": "sql-private-endpoint.nic.6aaf07c3-1bab-40d0-8736-2ed7e77a4677",
+    "Type": "Microsoft.Network/networkInterfaces"
+  },
+  {
+    "Location": "global",
+    "Name": "privatelink.database.windows.net",
+    "Type": "Microsoft.Network/privateDnsZones"
+  },
+  {
+    "Location": "global",
+    "Name": "privatelink.database.windows.net/sql-dns-link",
+    "Type": "Microsoft.Network/privateDnsZones/virtualNetworkLinks"
+  },
+  {
+    "Location": "spaincentral",
+    "Name": "aicalendar-config-542537",
+    "Type": "Microsoft.AppConfiguration/configurationStores"
+  },
+  {
+    "Location": "spaincentral",
+    "Name": "aicalendar-redis-6a07c6",
+    "Type": "Microsoft.Cache/Redis"
+  },
+  {
+    "Location": "spaincentral",
+    "Name": "aicalendar-agentNSG",
+    "Type": "Microsoft.Network/networkSecurityGroups"
+  },
+  {
+    "Location": "spaincentral",
+    "Name": "aicalendar-agentPublicIP",
+    "Type": "Microsoft.Network/publicIPAddresses"
+  },
+  {
+    "Location": "spaincentral",
+    "Name": "aicalendar-agentVMNic",
+    "Type": "Microsoft.Network/networkInterfaces"
+  },
+  {
+    "Location": "spaincentral",
+    "Name": "aicalendar-agent_OsDisk_1_2d850d66dc7948548f8e7f7c05ce9fff",
+    "Type": "Microsoft.Compute/disks"
+  },
+  {
+    "Location": "spaincentral",
+    "Name": "agent-v2PublicIP",
+    "Type": "Microsoft.Network/publicIPAddresses"
+  },
+  {
+    "Location": "spaincentral",
+    "Name": "agent-v2NSG",
+    "Type": "Microsoft.Network/networkSecurityGroups"
+  },
+  {
+    "Location": "spaincentral",
+    "Name": "agent-v2VMNic",
+    "Type": "Microsoft.Network/networkInterfaces"
+  },
+  {
+    "Location": "spaincentral",
+    "Name": "agent-v2",
+    "Type": "Microsoft.Compute/virtualMachines"
+  },
+  {
+    "Location": "spaincentral",
+    "Name": "agent-v2_OsDisk_1_dfda5b18bde5496d9b254a1c5646a58b",
+    "Type": "Microsoft.Compute/disks"
+  },
+  {
+    "Location": "spaincentral",
+    "Name": "aicalendar-env",
+    "Type": "Microsoft.App/managedEnvironments"
+  },
+  {
+    "Location": "spaincentral",
+    "Name": "redis-private-endpoint",
+    "Type": "Microsoft.Network/privateEndpoints"
+  },
+  {
+    "Location": "spaincentral",
+    "Name": "redis-private-endpoint.nic.136d9357-ff27-4d2e-ba37-b1d4542b1da1",
+    "Type": "Microsoft.Network/networkInterfaces"
+  },
+  {
+    "Location": "spaincentral",
+    "Name": "keyvault-private-endpoint",
+    "Type": "Microsoft.Network/privateEndpoints"
+  },
+  {
+    "Location": "spaincentral",
+    "Name": "keyvault-private-endpoint.nic.b7c83c2d-64b4-4102-a8b0-97d6d0cf1f21",
+    "Type": "Microsoft.Network/networkInterfaces"
+  },
+  {
+    "Location": "spaincentral",
+    "Name": "appconfig-private-endpoint",
+    "Type": "Microsoft.Network/privateEndpoints"
+  },
+  {
+    "Location": "spaincentral",
+    "Name": "appconfig-private-endpoint.nic.96a2a30d-6e7a-4283-b3c6-f4352da9431c",
+    "Type": "Microsoft.Network/networkInterfaces"
+  },
+  {
+    "Location": "global",
+    "Name": "privatelink.redis.cache.windows.net",
+    "Type": "Microsoft.Network/privateDnsZones"
+  },
+  {
+    "Location": "global",
+    "Name": "privatelink.vaultcore.azure.net",
+    "Type": "Microsoft.Network/privateDnsZones"
+  },
+  {
+    "Location": "global",
+    "Name": "privatelink.azconfig.io",
+    "Type": "Microsoft.Network/privateDnsZones"
+  },
+  {
+    "Location": "global",
+    "Name": "privatelink.redis.cache.windows.net/redis-dns-link",
+    "Type": "Microsoft.Network/privateDnsZones/virtualNetworkLinks"
+  },
+  {
+    "Location": "global",
+    "Name": "privatelink.vaultcore.azure.net/keyvault-dns-link",
+    "Type": "Microsoft.Network/privateDnsZones/virtualNetworkLinks"
+  },
+  {
+    "Location": "global",
+    "Name": "privatelink.azconfig.io/appconfig-dns-link",
+    "Type": "Microsoft.Network/privateDnsZones/virtualNetworkLinks"
+  },
+  {
+    "Location": "spaincentral",
+    "Name": "aicalendar-api",
+    "Type": "Microsoft.App/containerApps"
+  }
+]

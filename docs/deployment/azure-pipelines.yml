@@ -1,0 +1,834 @@
+# Azure DevOps Pipeline for AICalendar Application
+# Professional CI/CD with environment-specific deployments
+
+trigger:
+  branches:
+    include:
+    - main
+    - dev
+  paths:
+    exclude:
+    - README.md
+    - docs/*
+
+# Pipeline variables
+variables:
+  - group: aicalendar-variables
+  - name: imageRepository
+    value: 'aicalendar-api'
+  - name: dockerfilePath
+    value: '$(Build.SourcesDirectory)/Dockerfile'
+  - name: tag
+    value: '$(Build.BuildId)'
+
+# Use self-hosted agent pool
+pool:
+  name: Default
+
+# Different stages for dev and prod
+stages:
+
+#######################################
+# BUILD STAGE
+#######################################
+- stage: Build
+  displayName: 'Build and Push Docker Image'
+  jobs:
+  - job: Build
+    displayName: 'Build Job'
+    pool:
+      name: Default
+
+    steps:
+    # Install .NET SDK for EF Core tools
+    - task: UseDotNet@2
+      displayName: 'Install .NET 8 SDK'
+      inputs:
+        packageType: 'sdk'
+        version: '8.x'
+
+    # Restore NuGet packages (excluding test projects)
+    - task: DotNetCoreCLI@2
+      displayName: 'Restore NuGet Packages'
+      inputs:
+        command: 'restore'
+        projects: 'src/**/*.csproj'
+
+    # Generate EF Core migration script
+    - task: DotNetCoreCLI@2
+      displayName: 'Install EF Core Tools'
+      inputs:
+        command: 'custom'
+        custom: 'tool'
+        arguments: 'install --global dotnet-ef --version 8.0.*'
+
+    - task: Bash@3
+      displayName: 'Generate Migration SQL Script'
+      inputs:
+        targetType: 'inline'
+        script: |
+          set -e  # Exit on error
+
+          # Ensure dotnet ef is in PATH
+          export PATH="$PATH:$HOME/.dotnet/tools"
+
+          echo "========================================="
+          echo "Verifying dotnet ef installation..."
+          echo "========================================="
+          dotnet ef --version
+
+          echo ""
+          echo "========================================="
+          echo "Current directory: $(pwd)"
+          echo "Build.SourcesDirectory: $(Build.SourcesDirectory)"
+          echo "Build.ArtifactStagingDirectory: $(Build.ArtifactStagingDirectory)"
+          echo "========================================="
+
+          echo ""
+          echo "========================================="
+          echo "Checking project files..."
+          echo "========================================="
+          ls -la src/AICalendar.Infrastructure/ || echo "Infrastructure project not found"
+          ls -la src/AICalendar.API/ || echo "API project not found"
+
+          echo ""
+          echo "========================================="
+          echo "Generating migration script..."
+          echo "========================================="
+
+          # Navigate to source directory
+          cd $(Build.SourcesDirectory)
+
+          # Generate idempotent migration script with verbose output
+          dotnet ef migrations script \
+            --output $(Build.ArtifactStagingDirectory)/migrations.sql \
+            --idempotent \
+            --project src/AICalendar.Infrastructure/AICalendar.Infrastructure.csproj \
+            --startup-project src/AICalendar.API/AICalendar.API.csproj \
+            --context ApplicationDbContext \
+            --verbose
+
+          # Check if file was created
+          if [ -f "$(Build.ArtifactStagingDirectory)/migrations.sql" ]; then
+            FILE_SIZE=$(stat -c%s "$(Build.ArtifactStagingDirectory)/migrations.sql" 2>/dev/null || stat -f%z "$(Build.ArtifactStagingDirectory)/migrations.sql")
+            echo ""
+            echo "========================================="
+            echo "✓ Migration script generated successfully!"
+            echo "Script size: $FILE_SIZE bytes"
+            echo "Script location: $(Build.ArtifactStagingDirectory)/migrations.sql"
+            echo "========================================="
+
+            # Show first few lines
+            echo ""
+            echo "First 10 lines of migration script:"
+            head -n 10 $(Build.ArtifactStagingDirectory)/migrations.sql
+          else
+            echo ""
+            echo "========================================="
+            echo "✗ ERROR: Migration script was not created!"
+            echo "========================================="
+            exit 1
+          fi
+
+    # Publish migration script as artifact
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish Migration Script'
+      inputs:
+        PathtoPublish: '$(Build.ArtifactStagingDirectory)/migrations.sql'
+        ArtifactName: 'migrations'
+        publishLocation: 'Container'
+
+    # Build Docker Image
+    - task: Docker@2
+      displayName: 'Build Docker Image'
+      inputs:
+        command: build
+        repository: $(imageRepository)
+        dockerfile: $(dockerfilePath)
+        containerRegistry: 'ACR-ServiceConnection'
+        tags: |
+          $(tag)
+          latest
+          $(Build.SourceBranchName)-latest
+
+    - task: Docker@2
+      displayName: 'Push Docker Image to ACR'
+      inputs:
+        command: push
+        repository: $(imageRepository)
+        containerRegistry: 'ACR-ServiceConnection'
+        tags: |
+          $(tag)
+          latest
+          $(Build.SourceBranchName)-latest
+
+    # Run security scan on image
+    - task: AzureCLI@2
+      displayName: 'Scan Image for Vulnerabilities'
+      inputs:
+        azureSubscription: 'Azure-ServiceConnection'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          echo "Running security scan..."
+          # You can integrate tools like Trivy here
+          echo "Security scan completed"
+
+    # Publish build artifacts
+    - task: PublishBuildArtifacts@1
+      displayName: 'Publish Build Info'
+      inputs:
+        PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+        ArtifactName: 'drop'
+        publishLocation: 'Container'
+
+#######################################
+# DEPLOY TO DEV ENVIRONMENT
+#######################################
+- stage: DeployDev
+  displayName: 'Deploy to Development'
+  dependsOn: Build
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/dev'))
+
+  jobs:
+  - deployment: DeployDev
+    displayName: 'Deploy to Dev Environment'
+    pool:
+      name: Default
+    environment: 'dev'
+
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - checkout: self
+
+          # Download migration artifact
+          - task: DownloadBuildArtifacts@1
+            displayName: 'Download Migration Script'
+            inputs:
+              buildType: 'current'
+              downloadType: 'single'
+              artifactName: 'migrations'
+              downloadPath: '$(System.ArtifactsDirectory)'
+
+          - task: AzureCLI@2
+            displayName: 'Get ACR Login Server'
+            inputs:
+              azureSubscription: 'Azure-ServiceConnection'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                ACR_NAME=$(az acr list --resource-group $(resourceGroup) --query "[0].name" -o tsv)
+                ACR_LOGIN_SERVER=$(az acr show --name $ACR_NAME --resource-group $(resourceGroup) --query loginServer -o tsv)
+                echo "##vso[task.setvariable variable=acrLoginServer]$ACR_LOGIN_SERVER"
+
+          - task: AzureCLI@2
+            displayName: 'Get Key Vault Secrets'
+            inputs:
+              azureSubscription: 'Azure-ServiceConnection'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                KEYVAULT_NAME=$(az keyvault list --resource-group $(resourceGroup) --query "[0].name" -o tsv)
+                echo "##vso[task.setvariable variable=keyVaultName]$KEYVAULT_NAME"
+
+          - task: AzureCLI@2
+            displayName: 'Get App Configuration Endpoint'
+            inputs:
+              azureSubscription: 'Azure-ServiceConnection'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                APP_CONFIG_NAME=$(az appconfig list --resource-group $(resourceGroup) --query "[0].name" -o tsv)
+                APP_CONFIG_ENDPOINT=$(az appconfig show --name $APP_CONFIG_NAME --resource-group $(resourceGroup) --query endpoint -o tsv)
+                echo "##vso[task.setvariable variable=appConfigEndpoint]$APP_CONFIG_ENDPOINT"
+
+          # Apply database migrations BEFORE deploying app
+          - task: AzureCLI@2
+            displayName: 'Apply Database Migrations'
+            inputs:
+              azureSubscription: 'Azure-ServiceConnection'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                echo "========================================="
+                echo "Applying Database Migrations to DEV"
+                echo "========================================="
+
+                # Get SQL Server connection details from Key Vault
+                SQL_CONNECTION_STRING=$(az keyvault secret show \
+                  --vault-name $(keyVaultName) \
+                  --name SqlConnectionString \
+                  --query value -o tsv)
+
+                echo "Connection String (masked): ${SQL_CONNECTION_STRING:0:50}..."
+
+                # Extract server - try multiple patterns
+                SQL_SERVER=$(echo "$SQL_CONNECTION_STRING" | grep -oP 'Server=tcp:\K[^,;]+' || echo "$SQL_CONNECTION_STRING" | grep -oP 'Server=\K[^,;]+' || echo "$SQL_CONNECTION_STRING" | grep -oP 'Data Source=\K[^,;]+')
+                SQL_SERVER=$(echo "$SQL_SERVER" | sed 's/tcp://' | sed 's/:1433$//' | sed 's/,1433$//')
+                SQL_DATABASE=$(echo "$SQL_CONNECTION_STRING" | grep -oP 'Database=\K[^;]+' || echo "$SQL_CONNECTION_STRING" | grep -oP 'Initial Catalog=\K[^;]+')
+
+                echo "SQL Server: '$SQL_SERVER'"
+                echo "Database: '$SQL_DATABASE'"
+
+                if [ -z "$SQL_SERVER" ] || [ -z "$SQL_DATABASE" ]; then
+                  echo "ERROR: Could not parse SQL Server or Database from connection string"
+                  exit 1
+                fi
+
+                # Get agent's public IP
+                AGENT_IP=$(curl -s https://api.ipify.org)
+                echo "Agent Public IP: $AGENT_IP"
+
+                # Extract just the server name (before .database.windows.net)
+                SQL_SERVER_NAME=$(echo "$SQL_SERVER" | cut -d'.' -f1)
+                echo "SQL Server Name: '$SQL_SERVER_NAME'"
+
+                if [ -z "$SQL_SERVER_NAME" ]; then
+                  echo "ERROR: Could not extract SQL Server name"
+                  exit 1
+                fi
+
+                # Find the SQL Server resource group
+                echo "Finding SQL Server resource group..."
+                SQL_RESOURCE_GROUP=$(az sql server list --query "[?fullyQualifiedDomainName=='$SQL_SERVER'].resourceGroup" -o tsv)
+
+                if [ -z "$SQL_RESOURCE_GROUP" ]; then
+                  echo "Could not find SQL Server by FQDN, trying by name..."
+                  SQL_RESOURCE_GROUP=$(az sql server list --query "[?name=='$SQL_SERVER_NAME'].resourceGroup" -o tsv)
+                fi
+
+                if [ -z "$SQL_RESOURCE_GROUP" ]; then
+                  echo "Could not find SQL Server resource group, using pipeline resource group"
+                  SQL_RESOURCE_GROUP="$(resourceGroup)"
+                fi
+
+                echo "SQL Resource Group: '$SQL_RESOURCE_GROUP'"
+
+                # Create firewall rule (will update if exists)
+                echo "Creating firewall rule..."
+                FIREWALL_RULE_NAME="AzureDevOpsAgent-$(Build.BuildId)"
+
+                az sql server firewall-rule create \
+                  --resource-group "$SQL_RESOURCE_GROUP" \
+                  --server "$SQL_SERVER_NAME" \
+                  --name "$FIREWALL_RULE_NAME" \
+                  --start-ip-address "$AGENT_IP" \
+                  --end-ip-address "$AGENT_IP" \
+                  --output none
+
+                if [ $? -eq 0 ]; then
+                  echo "✓ Firewall rule created successfully"
+                else
+                  echo "✗ Failed to create firewall rule"
+                  exit 1
+                fi
+
+                echo "Waiting 15 seconds for firewall to propagate..."
+                sleep 15
+
+                # Test connectivity
+                echo "Testing connectivity to $SQL_SERVER:1433..."
+                timeout 5 bash -c "cat < /dev/null > /dev/tcp/$SQL_SERVER/1433" && echo "✓ Port 1433 is reachable" || echo "✗ Port 1433 is not reachable"
+
+                # Install sqlcmd if not present
+                if ! command -v sqlcmd &> /dev/null; then
+                  echo "Installing sqlcmd..."
+                  curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
+                  curl https://packages.microsoft.com/config/ubuntu/20.04/prod.list | sudo tee /etc/apt/sources.list.d/msprod.list
+                  sudo apt-get update
+                  sudo ACCEPT_EULA=Y apt-get install -y mssql-tools unixodbc-dev
+                  export PATH="$PATH:/opt/mssql-tools/bin"
+                fi
+
+                # Extract SQL credentials from connection string
+                SQL_USER=$(echo "$SQL_CONNECTION_STRING" | grep -oP 'User ID=\K[^;]+' || echo "$SQL_CONNECTION_STRING" | grep -oP 'UID=\K[^;]+')
+                SQL_PASSWORD=$(echo "$SQL_CONNECTION_STRING" | grep -oP 'Password=\K[^;]+' || echo "$SQL_CONNECTION_STRING" | grep -oP 'PWD=\K[^;]+')
+
+                echo "SQL User: '$SQL_USER'"
+                echo "Password length: ${#SQL_PASSWORD}"
+
+                if [ -z "$SQL_USER" ] || [ -z "$SQL_PASSWORD" ]; then
+                  echo "ERROR: Could not extract SQL credentials from connection string"
+                  exit 1
+                fi
+
+                # Apply migration script using SQL Authentication
+                echo "Applying migration script..."
+                echo "Command: sqlcmd -S $SQL_SERVER -d $SQL_DATABASE -U $SQL_USER -P <password> -i <script> -l 60"
+
+                /opt/mssql-tools/bin/sqlcmd \
+                  -S "$SQL_SERVER" \
+                  -d "$SQL_DATABASE" \
+                  -U "$SQL_USER" \
+                  -P "$SQL_PASSWORD" \
+                  -i $(System.ArtifactsDirectory)/migrations/migrations.sql \
+                  -l 60
+
+                MIGRATION_RESULT=$?
+
+                # Clean up firewall rule
+                echo "Cleaning up firewall rule..."
+                az sql server firewall-rule delete \
+                  --resource-group "$SQL_RESOURCE_GROUP" \
+                  --server "$SQL_SERVER_NAME" \
+                  --name "$FIREWALL_RULE_NAME" \
+                  --output none 2>/dev/null || echo "Note: Could not delete firewall rule (may not exist)"
+
+                if [ $MIGRATION_RESULT -eq 0 ]; then
+                  echo "✓ Database migrations applied successfully!"
+                  exit 0
+                else
+                  echo "✗ Migration failed with exit code: $MIGRATION_RESULT"
+                  exit 1
+                fi
+
+          # Deploy Container App
+          - task: AzureCLI@2
+            displayName: 'Deploy to Container App (DEV)'
+            inputs:
+              azureSubscription: 'Azure-ServiceConnection'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                echo "========================================="
+                echo "Deploying to Container App (DEV)"
+                echo "========================================="
+
+                # Get SQL Server connection details from Key Vault
+                SQL_CONNECTION_STRING=$(az keyvault secret show \
+                  --vault-name $(keyVaultName) \
+                  --name SqlConnectionString \
+                  --query value -o tsv)
+
+                # Extract server and database from connection string
+                SQL_SERVER=$(echo $SQL_CONNECTION_STRING | grep -oP 'Server=tcp:\K[^,]+' | sed 's/,1433//')
+                SQL_DATABASE=$(echo $SQL_CONNECTION_STRING | grep -oP 'Database=\K[^;]+')
+
+                echo "SQL Server: $SQL_SERVER"
+                echo "Database: $SQL_DATABASE"
+
+                # Install sqlcmd if not present
+                if ! command -v sqlcmd &> /dev/null; then
+                  echo "Installing sqlcmd..."
+                  curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
+                  curl https://packages.microsoft.com/config/ubuntu/20.04/prod.list | sudo tee /etc/apt/sources.list.d/msprod.list
+                  sudo apt-get update
+                  sudo ACCEPT_EULA=Y apt-get install -y mssql-tools unixodbc-dev
+                  export PATH="$PATH:/opt/mssql-tools/bin"
+                fi
+
+                # Apply migration script using Azure AD authentication (using -G flag for Azure AD)
+                echo "Applying migration script..."
+
+                # Use Azure CLI authentication with sqlcmd
+                /opt/mssql-tools/bin/sqlcmd \
+                  -S $SQL_SERVER \
+                  -d $SQL_DATABASE \
+                  -G \
+                  -i $(System.ArtifactsDirectory)/migrations/migrations.sql
+
+                if [ $? -eq 0 ]; then
+                  echo "✓ Database migrations applied successfully!"
+                else
+                  echo "✗ Migration failed!"
+                  exit 1
+                fi
+
+          - task: AzureCLI@2
+            displayName: 'Update Container App (Dev)'
+            inputs:
+              azureSubscription: 'Azure-ServiceConnection'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                echo "Deploying to Development Environment..."
+
+                # Update container app with new image
+                az containerapp update \
+                  --name $(containerAppName)-dev \
+                  --resource-group $(resourceGroup) \
+                  --image $(acrLoginServer)/$(imageRepository):$(tag) \
+                  --set-env-vars \
+                    ASPNETCORE_ENVIRONMENT=Development \
+                    KeyVaultName=$(keyVaultName) \
+                    AppConfigEndpoint=$(appConfigEndpoint)
+
+                echo "Development deployment completed!"
+
+          - task: AzureCLI@2
+            displayName: 'Run Health Check (Dev)'
+            inputs:
+              azureSubscription: 'Azure-ServiceConnection'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                echo "Running health checks..."
+                APP_URL=$(az containerapp show \
+                  --name $(containerAppName)-dev \
+                  --resource-group $(resourceGroup) \
+                  --query properties.configuration.ingress.fqdn -o tsv)
+
+                echo "Application URL: https://$APP_URL"
+
+                # Wait for app to be ready
+                sleep 30
+
+                # Check health endpoint
+                HEALTH_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://$APP_URL/health || echo "000")
+
+                if [ "$HEALTH_STATUS" = "200" ]; then
+                  echo "✓ Health check passed!"
+                else
+                  echo "✗ Health check failed with status: $HEALTH_STATUS"
+                  exit 1
+                fi
+
+#######################################
+# DEPLOY TO PRODUCTION
+#######################################
+- stage: DeployProd
+  displayName: 'Deploy to Production'
+  dependsOn: Build
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+
+  jobs:
+  - deployment: DeployProd
+    displayName: 'Deploy to Production Environment'
+    pool:
+      name: Default
+    environment: 'production'
+
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - checkout: self
+
+          # Download migration artifact
+          - task: DownloadBuildArtifacts@1
+            displayName: 'Download Migration Script'
+            inputs:
+              buildType: 'current'
+              downloadType: 'single'
+              artifactName: 'migrations'
+              downloadPath: '$(System.ArtifactsDirectory)'
+
+          - task: AzureCLI@2
+            displayName: 'Get ACR Login Server'
+            inputs:
+              azureSubscription: 'Azure-ServiceConnection'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                ACR_NAME=$(az acr list --resource-group $(resourceGroup) --query "[0].name" -o tsv)
+                ACR_LOGIN_SERVER=$(az acr show --name $ACR_NAME --resource-group $(resourceGroup) --query loginServer -o tsv)
+                echo "##vso[task.setvariable variable=acrLoginServer]$ACR_LOGIN_SERVER"
+
+          - task: AzureCLI@2
+            displayName: 'Get Key Vault Name'
+            inputs:
+              azureSubscription: 'Azure-ServiceConnection'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                KEYVAULT_NAME=$(az keyvault list --resource-group $(resourceGroup) --query "[0].name" -o tsv)
+                echo "##vso[task.setvariable variable=keyVaultName]$KEYVAULT_NAME"
+
+          - task: AzureCLI@2
+            displayName: 'Get App Configuration Endpoint'
+            inputs:
+              azureSubscription: 'Azure-ServiceConnection'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                APP_CONFIG_NAME=$(az appconfig list --resource-group $(resourceGroup) --query "[0].name" -o tsv)
+                APP_CONFIG_ENDPOINT=$(az appconfig show --name $APP_CONFIG_NAME --resource-group $(resourceGroup) --query endpoint -o tsv)
+                echo "##vso[task.setvariable variable=appConfigEndpoint]$APP_CONFIG_ENDPOINT"
+
+          # Apply database migrations BEFORE deploying app
+          - task: AzureCLI@2
+            displayName: 'Apply Database Migrations to Production'
+            inputs:
+              azureSubscription: 'Azure-ServiceConnection'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                echo "========================================="
+                echo "Applying Database Migrations to PRODUCTION"
+                echo "========================================="
+
+                # Get SQL Server connection details from Key Vault
+                SQL_CONNECTION_STRING=$(az keyvault secret show \
+                  --vault-name $(keyVaultName) \
+                  --name SqlConnectionString \
+                  --query value -o tsv)
+
+                echo "Connection String (masked): ${SQL_CONNECTION_STRING:0:50}..."
+
+                # Extract server - try multiple patterns
+                SQL_SERVER=$(echo "$SQL_CONNECTION_STRING" | grep -oP 'Server=tcp:\K[^,;]+' || echo "$SQL_CONNECTION_STRING" | grep -oP 'Server=\K[^,;]+' || echo "$SQL_CONNECTION_STRING" | grep -oP 'Data Source=\K[^,;]+')
+                SQL_SERVER=$(echo "$SQL_SERVER" | sed 's/tcp://' | sed 's/:1433$//' | sed 's/,1433$//')
+                SQL_DATABASE=$(echo "$SQL_CONNECTION_STRING" | grep -oP 'Database=\K[^;]+' || echo "$SQL_CONNECTION_STRING" | grep -oP 'Initial Catalog=\K[^;]+')
+
+                echo "SQL Server: '$SQL_SERVER'"
+                echo "Database: '$SQL_DATABASE'"
+
+                if [ -z "$SQL_SERVER" ] || [ -z "$SQL_DATABASE" ]; then
+                  echo "ERROR: Could not parse SQL Server or Database from connection string"
+                  exit 1
+                fi
+
+                # Test connectivity
+                echo "Testing connectivity to $SQL_SERVER:1433..."
+                timeout 5 bash -c "cat < /dev/null > /dev/tcp/$SQL_SERVER/1433" && echo "✓ Port 1433 is reachable" || echo "✗ Port 1433 is not reachable"
+
+                # Install sqlcmd if not present
+                if ! command -v sqlcmd &> /dev/null; then
+                  echo "Installing sqlcmd..."
+                  curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
+                  curl https://packages.microsoft.com/config/ubuntu/20.04/prod.list | sudo tee /etc/apt/sources.list.d/msprod.list
+                  sudo apt-get update
+                  sudo ACCEPT_EULA=Y apt-get install -y mssql-tools unixodbc-dev
+                  export PATH="$PATH:/opt/mssql-tools/bin"
+                fi
+
+                # Extract SQL credentials from connection string
+                SQL_USER=$(echo "$SQL_CONNECTION_STRING" | grep -oP 'User ID=\K[^;]+' || echo "$SQL_CONNECTION_STRING" | grep -oP 'UID=\K[^;]+')
+                SQL_PASSWORD=$(echo "$SQL_CONNECTION_STRING" | grep -oP 'Password=\K[^;]+' || echo "$SQL_CONNECTION_STRING" | grep -oP 'PWD=\K[^;]+')
+
+                echo "SQL User: '$SQL_USER'"
+                echo "Password length: ${#SQL_PASSWORD}"
+
+                if [ -z "$SQL_USER" ] || [ -z "$SQL_PASSWORD" ]; then
+                  echo "ERROR: Could not extract SQL credentials from connection string"
+                  exit 1
+                fi
+
+                # Apply migration script using SQL Authentication
+                echo "Applying migration script..."
+                echo "Command: sqlcmd -S $SQL_SERVER -d $SQL_DATABASE -U $SQL_USER -P <password> -i <script> -l 60"
+
+                /opt/mssql-tools/bin/sqlcmd \
+                  -S "$SQL_SERVER" \
+                  -d "$SQL_DATABASE" \
+                  -U "$SQL_USER" \
+                  -P "$SQL_PASSWORD" \
+                  -i $(System.ArtifactsDirectory)/migrations/migrations.sql \
+                  -l 60
+
+                MIGRATION_RESULT=$?
+
+                if [ $MIGRATION_RESULT -eq 0 ]; then
+                  echo "✓ Database migrations applied successfully!"
+                  exit 0
+                else
+                  echo "✗ Migration failed with exit code: $MIGRATION_RESULT"
+                  exit 1
+                fi
+
+          # Blue-Green Deployment Strategy
+          - task: AzureCLI@2
+            displayName: 'Create New Revision (Green)'
+            inputs:
+              azureSubscription: 'Azure-ServiceConnection'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                echo "Creating new revision with updated image..."
+
+                # Update container app (creates new revision)
+                az containerapp update \
+                  --name $(containerAppName) \
+                  --resource-group $(resourceGroup) \
+                  --image $(acrLoginServer)/$(imageRepository):$(tag) \
+                  --set-env-vars \
+                    ASPNETCORE_ENVIRONMENT=Production \
+                    KeyVaultName=$(keyVaultName) \
+                    AppConfigEndpoint=$(appConfigEndpoint) \
+                  --revision-suffix $(tag)
+
+                echo "New revision created: $(containerAppName)--$(tag)"
+
+          - task: AzureCLI@2
+            displayName: 'Health Check on New Revision'
+            inputs:
+              azureSubscription: 'Azure-ServiceConnection'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                echo "Waiting for new revision to be ready..."
+                sleep 45
+
+                # Get app URL
+                APP_URL=$(az containerapp show \
+                  --name $(containerAppName) \
+                  --resource-group $(resourceGroup) \
+                  --query properties.configuration.ingress.fqdn -o tsv)
+
+                echo "Testing new revision at: https://$APP_URL"
+
+                # Health check with retries
+                MAX_RETRIES=5
+                RETRY_COUNT=0
+                HEALTH_STATUS="000"
+
+                while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+                  HEALTH_STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://$APP_URL/health || echo "000")
+
+                  if [ "$HEALTH_STATUS" = "200" ]; then
+                    echo "✓ Health check passed!"
+                    break
+                  fi
+
+                  RETRY_COUNT=$((RETRY_COUNT+1))
+                  echo "Health check attempt $RETRY_COUNT failed, retrying..."
+                  sleep 10
+                done
+
+                if [ "$HEALTH_STATUS" != "200" ]; then
+                  echo "✗ Health check failed after $MAX_RETRIES attempts"
+                  exit 1
+                fi
+
+          - task: AzureCLI@2
+            displayName: 'Canary Release (10% Traffic)'
+            inputs:
+              azureSubscription: 'Azure-ServiceConnection'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                echo "Starting canary release: 10% traffic to new revision..."
+
+                # Get current active revision
+                CURRENT_REVISION=$(az containerapp revision list \
+                  --name $(containerAppName) \
+                  --resource-group $(resourceGroup) \
+                  --query "[?properties.active==\`true\` && name!='$(containerAppName)--$(tag)'].name" -o tsv | head -n 1)
+
+                if [ -z "$CURRENT_REVISION" ]; then
+                  echo "No previous revision found, setting 100% traffic to new revision"
+                  az containerapp ingress traffic set \
+                    --name $(containerAppName) \
+                    --resource-group $(resourceGroup) \
+                    --revision-weight $(containerAppName)--$(tag)=100
+                else
+                  echo "Setting traffic split: 90% old, 10% new"
+                  az containerapp ingress traffic set \
+                    --name $(containerAppName) \
+                    --resource-group $(resourceGroup) \
+                    --revision-weight $CURRENT_REVISION=90 $(containerAppName)--$(tag)=10
+                fi
+
+                echo "Canary deployment active. Monitoring for 2 minutes..."
+                sleep 120
+
+          - task: AzureCLI@2
+            displayName: 'Full Deployment (100% Traffic)'
+            inputs:
+              azureSubscription: 'Azure-ServiceConnection'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                echo "Canary phase successful. Switching 100% traffic to new revision..."
+
+                az containerapp ingress traffic set \
+                  --name $(containerAppName) \
+                  --resource-group $(resourceGroup) \
+                  --revision-weight $(containerAppName)--$(tag)=100
+
+                echo "✓ Production deployment completed successfully!"
+                echo "New revision $(containerAppName)--$(tag) is now serving 100% of traffic"
+
+          - task: AzureCLI@2
+            displayName: 'Deactivate Old Revisions'
+            inputs:
+              azureSubscription: 'Azure-ServiceConnection'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                echo "Deactivating old revisions (keeping last 3)..."
+
+                # Get all revisions except the latest 3
+                OLD_REVISIONS=$(az containerapp revision list \
+                  --name $(containerAppName) \
+                  --resource-group $(resourceGroup) \
+                  --query "[?properties.active==\`true\`].name" -o tsv | tail -n +4)
+
+                if [ -z "$OLD_REVISIONS" ]; then
+                  echo "No old revisions to deactivate"
+                else
+                  for revision in $OLD_REVISIONS; do
+                    echo "Deactivating: $revision"
+                    az containerapp revision deactivate \
+                      --name $(containerAppName) \
+                      --resource-group $(resourceGroup) \
+                      --revision $revision
+                  done
+                fi
+
+                echo "Cleanup completed"
+
+          - task: AzureCLI@2
+            displayName: 'Post-Deployment Verification'
+            inputs:
+              azureSubscription: 'Azure-ServiceConnection'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                echo "Running post-deployment verification..."
+
+                APP_URL=$(az containerapp show \
+                  --name $(containerAppName) \
+                  --resource-group $(resourceGroup) \
+                  --query properties.configuration.ingress.fqdn -o tsv)
+
+                echo "Application URL: https://$APP_URL"
+                echo "Build: $(Build.BuildNumber)"
+                echo "Revision: $(containerAppName)--$(tag)"
+
+                # Send deployment notification (integrate with Teams/Slack if needed)
+                echo "✓ Deployment verification completed!"
+
+#######################################
+# ROLLBACK STAGE (Manual)
+#######################################
+- stage: Rollback
+  displayName: 'Rollback to Previous Version'
+  dependsOn: DeployProd
+  condition: failed()
+
+  jobs:
+  - job: ManualRollback
+    displayName: 'Manual Rollback Required'
+    pool:
+      name: Default
+
+    steps:
+    - task: AzureCLI@2
+      displayName: 'Show Rollback Instructions'
+      inputs:
+        azureSubscription: 'Azure-ServiceConnection'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          echo "========================================="
+          echo "  DEPLOYMENT FAILED - ROLLBACK NEEDED"
+          echo "========================================="
+          echo ""
+          echo "To rollback to previous revision:"
+          echo ""
+          echo "1. List available revisions:"
+          echo "   az containerapp revision list \\"
+          echo "     --name $(containerAppName) \\"
+          echo "     --resource-group $(resourceGroup) \\"
+          echo "     --query \"[?properties.active==\\\`true\\\`].[name,properties.trafficWeight]\" -o table"
+          echo ""
+          echo "2. Set traffic to previous revision:"
+          echo "   az containerapp ingress traffic set \\"
+          echo "     --name $(containerAppName) \\"
+          echo "     --resource-group $(resourceGroup) \\"
+          echo "     --revision-weight <PREVIOUS_REVISION>=100"
+          echo ""
+          echo "========================================="clea

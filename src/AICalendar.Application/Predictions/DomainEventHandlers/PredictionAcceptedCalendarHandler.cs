@@ -30,6 +30,7 @@ public class PredictionAcceptedCalendarHandler : INotificationHandler<DomainEven
     public async Task Handle(DomainEventNotification<PredictionBatchAcceptedEvent> notification, CancellationToken cancellationToken)
     {
         var domainEvent = notification.DomainEvent;
+        Console.WriteLine($"Handling PredictionBatchAcceptedEvent for PredictionId: {domainEvent}");
 
         _logger.LogInformation(
             "CALENDAR: Handling batch acceptance for Prediction {PredictionId}. {Count} items accepted.",

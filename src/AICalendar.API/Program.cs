@@ -127,7 +127,7 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 // Configure DbContext with Interceptors
-builder.Services.AddSingleton<AICalendar.Infrastructure.Persistence.Interceptors.OutboxInterceptor>();
+builder.Services.AddScoped<AICalendar.Infrastructure.Persistence.Interceptors.OutboxInterceptor>();
 
 builder.Services.AddDbContext<ApplicationDbContext>((serviceProvider, options) =>
 {

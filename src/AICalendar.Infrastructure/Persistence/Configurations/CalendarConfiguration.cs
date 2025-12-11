@@ -33,6 +33,10 @@ public class CalendarConfiguration : IEntityTypeConfiguration<Calendar>
 
         builder.Property(c => c.UpdatedAt);
 
+        // Add performance indexes
+        builder.HasIndex(c => c.CreatedAt);
+        builder.HasIndex(c => c.UpdatedAt);
+
         // Owned collection for CalendarItems
         builder.OwnsMany(c => c.Items, items =>
         {
@@ -84,6 +88,8 @@ public class CalendarConfiguration : IEntityTypeConfiguration<Calendar>
 
             items.HasIndex(i => i.PredictionItemId);
             items.HasIndex(i => i.DueDate);
+            items.HasIndex(i => i.IsPaid);
+            items.HasIndex("CalendarId");
         });
 
         // Ignore domain events (handled by base class)

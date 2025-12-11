@@ -4,6 +4,7 @@ using AICalendar.Application.PushNotifications.Commands.UnregisterDevice;
 using AICalendar.Application.PushNotifications.Queries.CheckDeviceRegistration;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OutputCaching;
 
 namespace AICalendar.API.Controllers;
 
@@ -259,6 +260,7 @@ public class PushNotificationsController : ControllerBase
     /// provides better user experience by allowing conditional registration flows.
     /// </remarks>
     [HttpGet("check-device/{userId:guid}")]
+    [OutputCache(PolicyName = "notifications-short")]
     [ProducesResponseType(typeof(DeviceRegistrationStatusResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status500InternalServerError)]

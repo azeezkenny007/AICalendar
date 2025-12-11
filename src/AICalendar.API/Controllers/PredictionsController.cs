@@ -277,7 +277,9 @@ public class PredictionsController : ControllerBase
     ///
     /// Sample 200 response:
     ///
-    ///     200 OK
+    ///     {
+    ///       "message": "Batch processing completed successfully. 2 item(s) accepted, 1 item(s) rejected."
+    ///     }
     ///
     /// Sample 400 response:
     ///
@@ -286,7 +288,7 @@ public class PredictionsController : ControllerBase
     /// Accepted items are added to the user's calendar, rejected items are discarded.
     /// </remarks>
     [HttpPost("batch-process")]
-    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(MessageResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> BatchProcess([FromBody] BatchProcessRequest request)
     {
@@ -297,7 +299,15 @@ public class PredictionsController : ControllerBase
 
         var result = await _mediator.Send(command);
 
-        return result.IsSuccess ? Ok() : BadRequest(result.Error);
+        if (result.IsSuccess)
+        {
+            var acceptedCount = request.AcceptedItemIds?.Count ?? 0;
+            var rejectedCount = request.RejectedItemIds?.Count ?? 0;
+            var message = $"Batch processing completed successfully. {acceptedCount} item(s) accepted, {rejectedCount} item(s) rejected.";
+            return Ok(new MessageResponse(message));
+        }
+
+        return BadRequest(result.Error);
     }
 
     /// <summary>

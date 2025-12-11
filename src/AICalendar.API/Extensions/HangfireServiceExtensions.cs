@@ -2,8 +2,10 @@ using AICalendar.Application.Common.Interfaces;
 using AICalendar.Infrastructure.BackgroundJobs;
 using Hangfire;
 using Hangfire.SqlServer;
+using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace AICalendar.API.Extensions;
 
@@ -26,6 +28,9 @@ public static class HangfireServiceExtensions
 
         // Register your filter first
         services.AddSingleton<LogJobFilter>();
+
+        // Ensure Hangfire schema exists before initialization
+        EnsureHangfireSchemaExists(hangfireSettings.ConnectionString);
 
         // Use the overload that provides IServiceProvider
         services.AddHangfire((provider, config) => config
@@ -56,5 +61,44 @@ public static class HangfireServiceExtensions
         services.AddScoped<IHangfireService, HangfireService>();
 
         return services;
+    }
+
+    private static void EnsureHangfireSchemaExists(string connectionString)
+    {
+        try
+        {
+            using var connection = new SqlConnection(connectionString);
+            connection.Open();
+
+            // Check if HangFire schema exists
+            var checkSchemaQuery = @"
+                SELECT COUNT(*)
+                FROM sys.schemas
+                WHERE name = 'HangFire'";
+
+            using var checkCommand = new SqlCommand(checkSchemaQuery, connection);
+            var schemaExists = (int)checkCommand.ExecuteScalar() > 0;
+
+            if (!schemaExists)
+            {
+                Console.WriteLine("HangFire schema does not exist. Creating schema...");
+
+                // Create HangFire schema
+                var createSchemaQuery = "CREATE SCHEMA [HangFire]";
+                using var createCommand = new SqlCommand(createSchemaQuery, connection);
+                createCommand.ExecuteNonQuery();
+
+                Console.WriteLine("✅ HangFire schema created successfully!");
+            }
+            else
+            {
+                Console.WriteLine("✅ HangFire schema already exists.");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"⚠️ Warning: Could not verify/create HangFire schema: {ex.Message}");
+            Console.WriteLine("Hangfire will attempt to create schema automatically with PrepareSchemaIfNecessary=true");
+        }
     }
 }

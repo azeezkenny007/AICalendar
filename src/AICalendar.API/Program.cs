@@ -5,6 +5,7 @@ using AICalendar.Domain.Interfaces;
 using AICalendar.Domain.Services;
 using AICalendar.Infrastructure.Data;
 using AICalendar.Infrastructure.Persistence.Repositories;
+using AICalendar.Infrastructure.Repositories;
 using AICalendar.Infrastructure.Persistence.UnitOfWork;
 using AICalendar.Infrastructure.ExternalServices.Cache;
 using AICalendar.Infrastructure.Services;
@@ -167,6 +168,7 @@ builder.Services.AddScoped<ICalendarRepository, CalendarRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IUserFeedbackRepository, UserFeedbackRepository>();
 builder.Services.AddScoped<IFailedPredictionAttemptRepository, FailedPredictionAttemptRepository>();
+builder.Services.AddScoped<IOutboxMessageRepository, OutboxMessageRepository>();
 
 // Register Domain Services
 builder.Services.AddScoped<ICalendarDomainService, CalendarDomainService>();

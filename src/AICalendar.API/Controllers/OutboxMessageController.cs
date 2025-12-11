@@ -33,7 +33,10 @@ public class OutboxMessageController : ControllerBase
     ///
     /// This endpoint will remove all outbox messages from the database. Use with caution.
     /// </remarks>
-    [HttpDelete]
+    [HttpDelete("delete")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<object>> DeleteAllOutboxMessages(CancellationToken cancellationToken)
     {
         var command = new DeleteAllOutboxMessagesCommand();

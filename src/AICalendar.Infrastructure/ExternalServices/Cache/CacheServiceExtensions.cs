@@ -118,4 +118,6 @@ internal class NullCacheService : ICacheService
         // Always execute the factory since we're not caching
         return await factory();
     }
+
+    public Task FlushAsync() => Task.CompletedTask;
 }

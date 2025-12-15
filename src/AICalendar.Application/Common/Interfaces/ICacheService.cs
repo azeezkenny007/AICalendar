@@ -40,4 +40,9 @@ public interface ICacheService
     /// <param name="expiration">Expiration time if created</param>
     /// <returns>The cached or created item</returns>
     Task<T?> GetOrSetAsync<T>(string key, Func<Task<T>> factory, TimeSpan expiration);
+
+    /// <summary>
+    /// Clear all cache entries
+    /// </summary>
+    Task FlushAsync();
 }

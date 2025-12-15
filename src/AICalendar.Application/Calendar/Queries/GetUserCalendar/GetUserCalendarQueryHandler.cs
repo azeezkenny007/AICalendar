@@ -22,44 +22,43 @@ public class GetUserCalendarQueryHandler : IRequestHandler<GetUserCalendarQuery,
     {
         var cacheKey = $"calendar:user:{request.UserId.Value}";
 
-        var cachedResult = await _cacheService.GetOrSetAsync(
-            cacheKey,
-            async () =>
-            {
-                var calendar = await _calendarRepository.GetByUserIdAsync(request.UserId, cancellationToken);
+        // Try to get from cache first
+        var cachedResult = await _cacheService.GetAsync<CalendarDto>(cacheKey);
+        if (cachedResult != null)
+        {
+            return Result<CalendarDto>.Success(cachedResult);
+        }
 
-                if (calendar == null)
-                {
-                    return null;
-                }
+        // If not in cache, fetch from database
+        var calendar = await _calendarRepository.GetByUserIdAsync(request.UserId, cancellationToken);
 
-                return new CalendarDto(
-                    calendar.Id.Value,
-                    calendar.UserId.Value,
-                    calendar.Items.Select(i => new CalendarItemDto(
-                        i.Id.Value,
-                        i.PredictionItemId.Value,
-                        i.Merchant,
-                        i.Amount,
-                        i.DueDate,
-                        i.Account,
-                        i.AccountName,
-                        i.Description,
-                        i.IsPaid,
-                        i.PaidDate,
-                        i.CreatedAt
-                    )).ToList(),
-                    calendar.CreatedAt
-                );
-            },
-            TimeSpan.FromHours(1)
-        );
-
-        if (cachedResult == null)
+        if (calendar == null)
         {
             return Result<CalendarDto>.Failure($"Calendar for user {request.UserId.Value} not found.");
         }
 
-        return Result<CalendarDto>.Success(cachedResult);
+        var calendarDto = new CalendarDto(
+            calendar.Id.Value,
+            calendar.UserId.Value,
+            calendar.Items.Select(i => new CalendarItemDto(
+                i.Id.Value,
+                i.PredictionItemId.Value,
+                i.Merchant,
+                i.Amount,
+                i.DueDate,
+                i.Account,
+                i.AccountName,
+                i.Description,
+                i.IsPaid,
+                i.PaidDate,
+                i.CreatedAt
+            )).ToList(),
+            calendar.CreatedAt
+        );
+
+        // Cache the result (only if found)
+        await _cacheService.SetAsync(cacheKey, calendarDto, TimeSpan.FromHours(1));
+
+        return Result<CalendarDto>.Success(calendarDto);
     }
 }

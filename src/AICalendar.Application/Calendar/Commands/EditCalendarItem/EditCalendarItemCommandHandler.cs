@@ -12,20 +12,20 @@ public class EditCalendarItemCommandHandler : IRequestHandler<EditCalendarItemCo
     private readonly ICalendarRepository _calendarRepository;
     private readonly ICalendarDomainService _calendarDomainService;
     private readonly IUnitOfWork _unitOfWork;
-    private readonly ICacheInvalidator _cacheInvalidator;
+    private readonly ICacheService _cacheService;
     private readonly ILogger<EditCalendarItemCommandHandler> _logger;
 
     public EditCalendarItemCommandHandler(
         ICalendarRepository calendarRepository,
         ICalendarDomainService calendarDomainService,
         IUnitOfWork unitOfWork,
-        ICacheInvalidator cacheInvalidator,
+        ICacheService cacheService,
         ILogger<EditCalendarItemCommandHandler> logger)
     {
         _calendarRepository = calendarRepository;
         _calendarDomainService = calendarDomainService;
         _unitOfWork = unitOfWork;
-        _cacheInvalidator = cacheInvalidator;
+        _cacheService = cacheService;
         _logger = logger;
     }
 
@@ -43,6 +43,19 @@ public class EditCalendarItemCommandHandler : IRequestHandler<EditCalendarItemCo
                 $"The calendar item with ID '{request.ItemId.Value}' does not exist or may have been deleted."
             );
         }
+
+        // Reload the calendar to ensure proper EF Core tracking
+        var trackedCalendar = await _calendarRepository.GetByIdAsync(calendar.Id, cancellationToken);
+        if (trackedCalendar == null)
+        {
+            return OperationResult.NotFound(
+                "Calendar not found",
+                "Failed to reload calendar for update.",
+                "The calendar could not be reloaded from the database."
+            );
+        }
+
+        calendar = trackedCalendar;
 
         // Get the existing item to use current values as fallbacks
         var existingItem = calendar.Items.First(i => i.Id == request.ItemId);
@@ -126,10 +139,13 @@ public class EditCalendarItemCommandHandler : IRequestHandler<EditCalendarItemCo
             );
         }
 
+        // Explicitly update the calendar in the repository to ensure EF Core tracks changes
+        await _calendarRepository.UpdateAsync(calendar, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        // Invalidate cache for calendar
-        await _cacheInvalidator.InvalidateCalendarCacheAsync(cancellationToken);
+        // Invalidate distributed cache for this user's calendar
+        var cacheKey = $"calendar:user:{calendar.UserId.Value}";
+        await _cacheService.RemoveAsync(cacheKey);
 
         _logger.LogInformation(
             "Calendar item {ItemId} updated: {Merchant} - ${Amount} due on {DueDate}",

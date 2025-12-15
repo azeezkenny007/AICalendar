@@ -1,6 +1,7 @@
 using AICalendar.Domain.Common;
 using AICalendar.Domain.Interfaces;
 using AICalendar.Domain.ValueObjects;
+using AICalendar.Application.Common.Interfaces;
 using MediatR;
 using Microsoft.Extensions.Logging;
 
@@ -10,16 +11,22 @@ public class BatchProcessPredictionItemsCommandHandler
     : IRequestHandler<BatchProcessPredictionItemsCommand, Result>
 {
     private readonly IPredictionRepository _repository;
+    private readonly ICalendarRepository _calendarRepository;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly ICacheService _cacheService;
     private readonly ILogger<BatchProcessPredictionItemsCommandHandler> _logger;
 
     public BatchProcessPredictionItemsCommandHandler(
         IPredictionRepository repository,
+        ICalendarRepository calendarRepository,
         IUnitOfWork unitOfWork,
+        ICacheService cacheService,
         ILogger<BatchProcessPredictionItemsCommandHandler> _logger)
     {
         _repository = repository;
+        _calendarRepository = calendarRepository;
         _unitOfWork = unitOfWork;
+        _cacheService = cacheService;
         this._logger = _logger;
     }
 
@@ -86,16 +93,37 @@ public class BatchProcessPredictionItemsCommandHandler
             var itemIds = itemsByPrediction[predictionId];
 
             var acceptedInThisBatch = itemIds.Intersect(request.AcceptedItemIds).ToList();
+            _logger.LogInformation(
+                "Processing Prediction {PredictionId} with {AcceptedCount} accepted and {RejectedCount} rejected items",
+                predictionId,
+                acceptedInThisBatch.Count,
+                acceptedInThisBatch
+            );
+
             var rejectedInThisBatch = itemIds.Intersect(request.RejectedItemIds).ToList();
 
             if (acceptedInThisBatch.Any())
             {
                 var result = prediction.AcceptItems(acceptedInThisBatch);
+                
                 if (result.IsFailure)
                 {
-                    // In a real app, we might want to rollback or return partial success
-                    // For now, we log and continue, or fail fast. Let's fail fast for safety.
                     return Result.Failure(result.Error);
+                }
+
+                // Populate calendar with accepted items
+                var populateCalendarResult = await PopulateCalendarWithAcceptedItems(
+                    prediction, 
+                    acceptedInThisBatch, 
+                    ct);
+                
+                if (populateCalendarResult.IsFailure)
+                {
+                    _logger.LogError(
+                        "Failed to populate calendar for prediction {PredictionId}: {Error}",
+                        predictionId,
+                        populateCalendarResult.Error);
+                    return populateCalendarResult;
                 }
             }
 
@@ -116,5 +144,93 @@ public class BatchProcessPredictionItemsCommandHandler
         _logger.LogInformation("Successfully processed batch items");
 
         return Result.Success();
+    }
+
+    /// <summary>
+    /// Populates the user's calendar with accepted prediction items
+    /// </summary>
+    private async Task<Result> PopulateCalendarWithAcceptedItems(
+        Domain.Aggregates.PredictionAggregate.Prediction prediction,
+        List<PredictionItemId> acceptedItemIds,
+        CancellationToken ct)
+    {
+        try
+        {
+            // Get or create user's calendar
+            var calendar = await _calendarRepository.GetByUserIdAsync(prediction.UserId, ct);
+
+            if (calendar == null)
+            {
+                _logger.LogInformation("CALENDAR: Creating new calendar for user {UserId}", prediction.UserId.Value);
+                calendar = Domain.Aggregates.CalendarAggregate.Calendar.Create(prediction.UserId);
+                await _calendarRepository.AddAsync(calendar, ct);
+                
+                // Save the calendar to the database immediately so it has an ID for foreign key constraint
+                await _unitOfWork.SaveChangesAsync(ct);
+                _logger.LogInformation("CALENDAR: New calendar created and saved for user {UserId}", prediction.UserId.Value);
+            }
+
+            // Get the accepted items from the prediction
+            var acceptedItems = prediction.Items
+                .Where(item => acceptedItemIds.Contains(item.Id))
+                .ToList();
+
+            _logger.LogInformation(
+                "CALENDAR: Processing {Count} accepted items for user {UserId}",
+                acceptedItems.Count,
+                prediction.UserId.Value);
+
+            // Add each accepted item to the calendar
+            foreach (var item in acceptedItems)
+            {
+                _logger.LogInformation(
+                    "CALENDAR: Adding item {ItemId} to Calendar: {Merchant} - ${Amount} due on {DueDate}",
+                    item.Id.Value,
+                    item.Merchant,
+                    item.Amount,
+                    item.DueDate.ToString("yyyy-MM-dd")
+                );
+
+                var result = calendar.AddItemFromPrediction(
+                    item.Id,
+                    item.Merchant,
+                    item.Amount,
+                    item.DueDate
+                );
+
+                if (!result.IsSuccess)
+                {
+                    _logger.LogWarning(
+                        "CALENDAR: Failed to add item {ItemId}: {Error}",
+                        item.Id.Value,
+                        result.Error
+                    );
+                    return result;
+                }
+            }
+
+            // Update the calendar with the new items
+            await _calendarRepository.UpdateAsync(calendar, ct);
+
+            // Invalidate cache for this user's calendar
+            var cacheKey = $"calendar:user:{prediction.UserId.Value}";
+            await _cacheService.RemoveAsync(cacheKey);
+
+            _logger.LogInformation(
+                "CALENDAR: Successfully processed {Count} items for user {UserId}",
+                acceptedItems.Count,
+                prediction.UserId.Value
+            );
+
+            return Result.Success();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "CALENDAR: Error populating calendar for user {UserId}",
+                prediction.UserId.Value);
+            return Result.Failure($"Failed to populate calendar: {ex.Message}");
+        }
     }
 }

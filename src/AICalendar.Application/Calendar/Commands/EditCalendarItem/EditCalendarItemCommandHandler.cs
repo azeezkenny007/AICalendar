@@ -13,6 +13,7 @@ public class EditCalendarItemCommandHandler : IRequestHandler<EditCalendarItemCo
     private readonly ICalendarDomainService _calendarDomainService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICacheService _cacheService;
+    private readonly ICacheInvalidator _cacheInvalidator;
     private readonly ILogger<EditCalendarItemCommandHandler> _logger;
 
     public EditCalendarItemCommandHandler(
@@ -20,12 +21,14 @@ public class EditCalendarItemCommandHandler : IRequestHandler<EditCalendarItemCo
         ICalendarDomainService calendarDomainService,
         IUnitOfWork unitOfWork,
         ICacheService cacheService,
+        ICacheInvalidator cacheInvalidator,
         ILogger<EditCalendarItemCommandHandler> logger)
     {
         _calendarRepository = calendarRepository;
         _calendarDomainService = calendarDomainService;
         _unitOfWork = unitOfWork;
         _cacheService = cacheService;
+        _cacheInvalidator = cacheInvalidator;
         _logger = logger;
     }
 
@@ -143,9 +146,10 @@ public class EditCalendarItemCommandHandler : IRequestHandler<EditCalendarItemCo
         await _calendarRepository.UpdateAsync(calendar, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-        // Invalidate distributed cache for this user's calendar
+        // Invalidate both distributed cache and output cache for this user's calendar
         var cacheKey = $"calendar:user:{calendar.UserId.Value}";
         await _cacheService.RemoveAsync(cacheKey);
+        await _cacheInvalidator.InvalidateCalendarCacheAsync(cancellationToken);
 
         _logger.LogInformation(
             "Calendar item {ItemId} updated: {Merchant} - ${Amount} due on {DueDate}",

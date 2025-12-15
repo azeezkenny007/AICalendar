@@ -62,6 +62,9 @@ public class DeleteAllCalendarDataCommandHandler : IRequestHandler<DeleteAllCale
                     await _cacheService.RemoveAsync(cacheKey);
                 }
                 
+                // Flush entire Redis cache to ensure complete cleanup
+                await _cacheService.FlushAsync();
+                
                 // Also invalidate the output cache for all calendar operations
                 await _cacheInvalidator.InvalidateCalendarCacheAsync(cancellationToken);
                 

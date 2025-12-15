@@ -95,6 +95,20 @@ public class RedisCacheService : ICacheService
         return newValue;
     }
 
+    public async Task FlushAsync()
+    {
+        try
+        {
+            var server = _redis.GetServer(_redis.GetEndPoints().First());
+            await server.FlushDatabaseAsync(_options.Redis.Database);
+            _logger.LogWarning("Flushed all cache entries from Redis database {Database}", _options.Redis.Database);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error flushing Redis cache");
+        }
+    }
+
     private string GetPrefixedKey(string key)
     {
         return string.IsNullOrEmpty(_keyPrefix) ? key : $"{_keyPrefix}{key}";
